@@ -1,0 +1,3599 @@
+{
+  "sourceLanguage": "it",
+  "strings": {
+    "": {
+      "shouldTranslate": false
+    },
+    "%": {
+      "shouldTranslate": false
+    },
+    "%@ campioni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ samples"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ campioni"
+          }
+        }
+      }
+    },
+    "%@ campioni inviati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ samples sent"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ campioni inviati"
+          }
+        }
+      }
+    },
+    "%@ campioni inviati · %@ blocchi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ samples sent · %@ blocks"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ campioni inviati · %@ blocchi"
+          }
+        }
+      }
+    },
+    "%@ campioni inviati. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ samples sent. %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ campioni inviati. %@"
+          }
+        }
+      }
+    },
+    "%@ campioni inviati. Riprende da solo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ samples sent. It will resume on its own."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ campioni inviati. Riprende da solo."
+          }
+        }
+      }
+    },
+    "%@ – %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ – %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ – %@"
+          }
+        }
+      }
+    },
+    "%@%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%%"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%%"
+          }
+        }
+      }
+    },
+    "%@%% sopra la media": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%% above average"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%% sopra la media"
+          }
+        }
+      }
+    },
+    "%@%% sotto la media": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%% below average"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%% sotto la media"
+          }
+        }
+      }
+    },
+    "%lld": {
+      "shouldTranslate": false
+    },
+    "%lld blocchi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld blocks"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld blocchi"
+          }
+        }
+      }
+    },
+    "%lld eliminati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld deleted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld eliminati"
+          }
+        }
+      }
+    },
+    "/ %lld ore": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/ %lld hours"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/ %lld ore"
+          }
+        }
+      }
+    },
+    "A mano": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A mano"
+          }
+        }
+      }
+    },
+    "A riposo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resting"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A riposo"
+          }
+        }
+      }
+    },
+    "Accendi almeno un gruppo qui sopra.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on at least one group above."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accendi almeno un gruppo qui sopra."
+          }
+        }
+      }
+    },
+    "Accendi un gruppo per aggiungerlo: Salute ti chiederà il permesso solo per i tipi nuovi. Il numero indica quanti tipi contiene ogni gruppo; partono solo quelli che hai autorizzato in Salute.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on a group to add it: Health will ask permission only for the new types. The number shows how many types each group contains; only those you allowed in Health are sent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accendi un gruppo per aggiungerlo: Salute ti chiederà il permesso solo per i tipi nuovi. Il numero indica quanti tipi contiene ogni gruppo; partono solo quelli che hai autorizzato in Salute."
+          }
+        }
+      }
+    },
+    "Aggiorna": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna"
+          }
+        }
+      }
+    },
+    "Aggiungi l'indirizzo del tuo server nelle Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your server's address in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi l'indirizzo del tuo server nelle Impostazioni."
+          }
+        }
+      }
+    },
+    "Allenamenti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workouts"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allenamenti"
+          }
+        }
+      }
+    },
+    "Ancora nessun dato di oggi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No data for today yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun dato di oggi"
+          }
+        }
+      }
+    },
+    "Annulla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla"
+          }
+        }
+      }
+    },
+    "Assistenza": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistenza"
+          }
+        }
+      }
+    },
+    "Attività": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attività"
+          }
+        }
+      }
+    },
+    "Base": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baseline"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Base"
+          }
+        }
+      }
+    },
+    "Calorie, acqua, macronutrienti, vitamine, minerali": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calories, water, macronutrients, vitamins, minerals"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calorie, acqua, macronutrienti, vitamine, minerali"
+          }
+        }
+      }
+    },
+    "Ciclo e salute riproduttiva": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cycle and reproductive health"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ciclo e salute riproduttiva"
+          }
+        }
+      }
+    },
+    "Ciclo mestruale, test, gravidanza, attività sessuale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menstrual cycle, tests, pregnancy, sexual activity"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ciclo mestruale, test, gravidanza, attività sessuale"
+          }
+        }
+      }
+    },
+    "Classificazione di Apple, non una diagnosi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's classification, not a diagnosis"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Classificazione di Apple, non una diagnosi"
+          }
+        }
+      }
+    },
+    "Codice sorgente (licenza MIT)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source code (MIT license)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codice sorgente (licenza MIT)"
+          }
+        }
+      }
+    },
+    "Comprimi con gzip": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compress with gzip"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprimi con gzip"
+          }
+        }
+      }
+    },
+    "Configura l'indirizzo di destinazione nelle Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set the destination address in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configura l'indirizzo di destinazione nelle Impostazioni."
+          }
+        }
+      }
+    },
+    "Configura più tardi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up later"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configura più tardi"
+          }
+        }
+      }
+    },
+    "Consenti accesso a Salute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow access to Health"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti accesso a Salute"
+          }
+        }
+      }
+    },
+    "Continua": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua"
+          }
+        }
+      }
+    },
+    "Corpo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Body"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corpo"
+          }
+        }
+      }
+    },
+    "Cuore": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heart"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuore"
+          }
+        }
+      }
+    },
+    "Dati da sincronizzare": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data to sync"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dati da sincronizzare"
+          }
+        }
+      }
+    },
+    "Dati di esempio inventati, Salute non viene letta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Made-up sample data, Health is not read"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dati di esempio inventati, Salute non viene letta"
+          }
+        }
+      }
+    },
+    "Derivazione I · %lld secondi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lead I · %lld seconds"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Derivazione I · %lld secondi"
+          }
+        }
+      }
+    },
+    "Destinazione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destinazione"
+          }
+        }
+      }
+    },
+    "Diagnostica": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostica"
+          }
+        }
+      }
+    },
+    "Dimensione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimensione"
+          }
+        }
+      }
+    },
+    "Dove inviare i dati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where to send your data"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dove inviare i dati"
+          }
+        }
+      }
+    },
+    "ECG": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ECG"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ECG"
+          }
+        }
+      }
+    },
+    "Energia": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energy"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energia"
+          }
+        }
+      }
+    },
+    "Errore": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Errore"
+          }
+        }
+      }
+    },
+    "Esporta il registro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the log"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta il registro"
+          }
+        }
+      }
+    },
+    "Esposizione sonora, audiogrammi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound exposure, audiograms"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esposizione sonora, audiogrammi"
+          }
+        }
+      }
+    },
+    "Fasi del sonno, temperatura notturna, apnee": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sleep stages, overnight temperature, apnea"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fasi del sonno, temperatura notturna, apnee"
+          }
+        }
+      }
+    },
+    "Fatto. Salute non rivela quali tipi hai concesso: i dati non autorizzati semplicemente non partono.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done. Health doesn't reveal which types you granted: unauthorized data simply isn't sent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fatto. Salute non rivela quali tipi hai concesso: i dati non autorizzati semplicemente non partono."
+          }
+        }
+      }
+    },
+    "Fibrillazione atriale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atrial fibrillation"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fibrillazione atriale"
+          }
+        }
+      }
+    },
+    "Frequenza": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rate"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequenza"
+          }
+        }
+      }
+    },
+    "Frequenza respiratoria, ossigeno, spirometria": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Respiratory rate, oxygen, spirometry"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequenza respiratoria, ossigeno, spirometria"
+          }
+        }
+      }
+    },
+    "Frequenza, HRV, pressione, notifiche del ritmo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heart rate, HRV, blood pressure, rhythm notifications"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequenza, HRV, pressione, notifiche del ritmo"
+          }
+        }
+      }
+    },
+    "Giorno": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Day"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giorno"
+          }
+        }
+      }
+    },
+    "Già in pari": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to date"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già in pari"
+          }
+        }
+      }
+    },
+    "Glicemia e alcol": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glucose and alcohol"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glicemia e alcol"
+          }
+        }
+      }
+    },
+    "Glicemia, insulina, alcol": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blood glucose, insulin, alcohol"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glicemia, insulina, alcol"
+          }
+        }
+      }
+    },
+    "Gratuita, senza pubblicità": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free, no ads"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gratuita, senza pubblicità"
+          }
+        }
+      }
+    },
+    "I percorsi GPS degli allenamenti restano spenti: puoi accenderli in Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workout GPS routes stay off: you can turn them on in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I percorsi GPS degli allenamenti restano spenti: puoi accenderli in Impostazioni."
+          }
+        }
+      }
+    },
+    "I tuoi dati di Salute, sincronizzati in automatico con il server che scegli tu.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Health data, synced automatically to the server you choose."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I tuoi dati di Salute, sincronizzati in automatico con il server che scegli tu."
+          }
+        }
+      }
+    },
+    "I tuoi dati vanno solo dove decidi tu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your data goes only where you decide"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I tuoi dati vanno solo dove decidi tu"
+          }
+        }
+      }
+    },
+    "Ieri": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ieri"
+          }
+        }
+      }
+    },
+    "Igiene": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hygiene"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Igiene"
+          }
+        }
+      }
+    },
+    "Il primo invio porterà con sé tutto lo storico.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first sync will bring your whole history along."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il primo invio porterà con sé tutto lo storico."
+          }
+        }
+      }
+    },
+    "Il registro contiene solo eventi tecnici (tipi di dato, conteggi, esiti, errori), mai valori di salute. Dopo ogni sincronizzazione, al massimo ogni 15 minuti, le righe nuove vengono inviate anche al tuo server.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The log contains only technical events (data types, counts, outcomes, errors), never health values. After each sync, at most every 15 minutes, new lines are also sent to your server."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il registro contiene solo eventi tecnici (tipi di dato, conteggi, esiti, errori), mai valori di salute. Dopo ogni sincronizzazione, al massimo ogni 15 minuti, le righe nuove vengono inviate anche al tuo server."
+          }
+        }
+      }
+    },
+    "Il server ha rifiutato il token (%lld). Controllalo nelle Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server rejected the token (%lld). Check it in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha rifiutato il token (%lld). Controllalo nelle Impostazioni."
+          }
+        }
+      }
+    },
+    "Il server ha rifiutato un blocco troppo grande (413).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server rejected a block that was too large (413)."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha rifiutato un blocco troppo grande (413)."
+          }
+        }
+      }
+    },
+    "Il server ha risposto %lld.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server replied %lld."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha risposto %lld."
+          }
+        }
+      }
+    },
+    "Il server ha risposto %lld: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server replied %lld: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha risposto %lld: %@"
+          }
+        }
+      }
+    },
+    "Il server ha risposto: tutto a posto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server replied: all good."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha risposto: tutto a posto."
+          }
+        }
+      }
+    },
+    "Il server ha un problema temporaneo (%lld).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server has a temporary problem (%lld)."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha un problema temporaneo (%lld)."
+          }
+        }
+      }
+    },
+    "Il token è custodito nel Portachiavi e inviato come «Authorization: Bearer». Se l'indirizzo contiene già un parametro come ?t=…, viene usato così com'è.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The token is kept in the Keychain and sent as “Authorization: Bearer”. If the address already contains a parameter like ?t=…, it is used as is."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il token è custodito nel Portachiavi e inviato come «Authorization: Bearer». Se l'indirizzo contiene già un parametro come ?t=…, viene usato così com'è."
+          }
+        }
+      }
+    },
+    "Impossibile chiedere i permessi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't request permissions: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile chiedere i permessi: %@"
+          }
+        }
+      }
+    },
+    "Impostazioni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni"
+          }
+        }
+      }
+    },
+    "In attesa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In attesa"
+          }
+        }
+      }
+    },
+    "In attesa dello sblocco": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for unlock"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In attesa dello sblocco"
+          }
+        }
+      }
+    },
+    "In attesa dello sblocco dell'iPhone": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the iPhone to be unlocked"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In attesa dello sblocco dell'iPhone"
+          }
+        }
+      }
+    },
+    "In background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In background"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In background"
+          }
+        }
+      }
+    },
+    "In evidenza": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlights"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In evidenza"
+          }
+        }
+      }
+    },
+    "In pausa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa"
+          }
+        }
+      }
+    },
+    "In pausa: %@ Riprenderà da qui.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused: %@ It will resume from here."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa: %@ Riprenderà da qui."
+          }
+        }
+      }
+    },
+    "In pausa: iPhone bloccato, riprende da solo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused: iPhone locked, resumes automatically"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa: iPhone bloccato, riprende da solo"
+          }
+        }
+      }
+    },
+    "In piedi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stand"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In piedi"
+          }
+        }
+      }
+    },
+    "Indirizzo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indirizzo"
+          }
+        }
+      }
+    },
+    "Indirizzo non trovato sul server (404).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address not found on the server (404)."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indirizzo non trovato sul server (404)."
+          }
+        }
+      }
+    },
+    "Indirizzo non valido: usa https:// (http solo in rete locale).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid address: use https:// (http only on the local network)."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indirizzo non valido: usa https:// (http solo in rete locale)."
+          }
+        }
+      }
+    },
+    "Informativa sulla privacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informativa sulla privacy"
+          }
+        }
+      }
+    },
+    "Informazioni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informazioni"
+          }
+        }
+      }
+    },
+    "Inizia": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizia"
+          }
+        }
+      }
+    },
+    "Interrotto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrupted"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotto"
+          }
+        }
+      }
+    },
+    "Invia di nuovo tutto lo storico": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resend the whole history"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia di nuovo tutto lo storico"
+          }
+        }
+      }
+    },
+    "Invia diagnostica ora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send diagnostics now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia diagnostica ora"
+          }
+        }
+      }
+    },
+    "Invia solo le novità, anche in background, appena Salute le registra.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends only what's new, even in the background, as soon as Health records it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia solo le novità, anche in background, appena Salute le registra."
+          }
+        }
+      }
+    },
+    "Invia tutto lo storico": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send the whole history"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia tutto lo storico"
+          }
+        }
+      }
+    },
+    "Inviare di nuovo tutto lo storico?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resend the whole history?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviare di nuovo tutto lo storico?"
+          }
+        }
+      }
+    },
+    "Inviata al tuo server.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to your server."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviata al tuo server."
+          }
+        }
+      }
+    },
+    "Invii": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncs"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invii"
+          }
+        }
+      }
+    },
+    "Invio in corso…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invio in corso…"
+          }
+        }
+      }
+    },
+    "Invio interrotto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync interrupted."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invio interrotto."
+          }
+        }
+      }
+    },
+    "Invio interrotto: riprenderà dal punto in cui si è fermato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync interrupted: it will resume where it stopped."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invio interrotto: riprenderà dal punto in cui si è fermato."
+          }
+        }
+      }
+    },
+    "L'indirizzo HTTPS del tuo server. Riceverà un POST JSON a ogni novità.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your server's HTTPS address. It will receive a JSON POST with every update."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'indirizzo HTTPS del tuo server. Riceverà un POST JSON a ogni novità."
+          }
+        }
+      }
+    },
+    "La chiave del tuo server è custodita nel Portachiavi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your server's key is kept in the Keychain."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La chiave del tuo server è custodita nel Portachiavi."
+          }
+        }
+      }
+    },
+    "Lavaggio delle mani, spazzolino": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handwashing, toothbrushing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lavaggio delle mani, spazzolino"
+          }
+        }
+      }
+    },
+    "Leggero": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Core"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leggero"
+          }
+        }
+      }
+    },
+    "Mal di testa, febbre, tosse e altri sintomi registrati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Headache, fever, cough and other logged symptoms"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mal di testa, febbre, tosse e altri sintomi registrati"
+          }
+        }
+      }
+    },
+    "Manca la destinazione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destination yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manca la destinazione"
+          }
+        }
+      }
+    },
+    "Media 7 giorni: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7-day average: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media 7 giorni: %@"
+          }
+        }
+      }
+    },
+    "Mindfulness": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mindfulness"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mindfulness"
+          }
+        }
+      }
+    },
+    "Minuti di consapevolezza, stato d'animo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mindful minutes, state of mind"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minuti di consapevolezza, stato d'animo"
+          }
+        }
+      }
+    },
+    "Modalità dimostrativa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo mode"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modalità dimostrativa"
+          }
+        }
+      }
+    },
+    "Modalità dimostrativa: dati di esempio inventati. Spegnila in Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo mode: made-up sample data. Turn it off in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modalità dimostrativa: dati di esempio inventati. Spegnila in Impostazioni."
+          }
+        }
+      }
+    },
+    "Nessun abbonamento, nessuna pubblicità, un formato JSON documentato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No subscription, no ads, a documented JSON format."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun abbonamento, nessuna pubblicità, un formato JSON documentato."
+          }
+        }
+      }
+    },
+    "Nessun account": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun account"
+          }
+        }
+      }
+    },
+    "Nessun account, nessuna analisi, nessuna pubblicità, nessun SDK di terze parti, nessun iCloud.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account, no analytics, no ads, no third-party SDKs, no iCloud."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun account, nessuna analisi, nessuna pubblicità, nessun SDK di terze parti, nessun iCloud."
+          }
+        }
+      }
+    },
+    "Nessun dato nuovo da inviare": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new data to send"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun dato nuovo da inviare"
+          }
+        }
+      }
+    },
+    "Nessun indirizzo di destinazione configurato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destination address configured."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun indirizzo di destinazione configurato."
+          }
+        }
+      }
+    },
+    "Nessun intermediario: dal tuo iPhone direttamente al tuo server.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No middleman: straight from your iPhone to your server."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun intermediario: dal tuo iPhone direttamente al tuo server."
+          }
+        }
+      }
+    },
+    "Nessun invio ancora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No syncs yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun invio ancora"
+          }
+        }
+      }
+    },
+    "Nessuna registrazione, nessuna analisi, nessuna pubblicità, nessun SDK di terze parti, nessun iCloud.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sign-up, no analytics, no ads, no third-party SDKs, no iCloud."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna registrazione, nessuna analisi, nessuna pubblicità, nessun SDK di terze parti, nessun iCloud."
+          }
+        }
+      }
+    },
+    "Niente copie": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No copies"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niente copie"
+          }
+        }
+      }
+    },
+    "Niente è andato perso: si riparte da qui": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing was lost: it will pick up from here"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niente è andato perso: si riparte da qui"
+          }
+        }
+      }
+    },
+    "Non classificato": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not classified"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non classificato"
+          }
+        }
+      }
+    },
+    "Non conclusivo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inconclusive"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non conclusivo"
+          }
+        }
+      }
+    },
+    "Non conclusivo · battito alto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inconclusive · high heart rate"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non conclusivo · battito alto"
+          }
+        }
+      }
+    },
+    "Non conclusivo · battito basso": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inconclusive · low heart rate"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non conclusivo · battito basso"
+          }
+        }
+      }
+    },
+    "Non hai un server? Prova con dati di esempio": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No server? Try it with sample data"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non hai un server? Prova con dati di esempio"
+          }
+        }
+      }
+    },
+    "Nuovi dati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New data"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuovi dati"
+          }
+        }
+      }
+    },
+    "Nutrizione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nutrition"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nutrizione"
+          }
+        }
+      }
+    },
+    "Oggi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi"
+          }
+        }
+      }
+    },
+    "Ossigeno nel sangue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blood oxygen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ossigeno nel sangue"
+          }
+        }
+      }
+    },
+    "Parziale · in pausa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial · paused"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parziale · in pausa"
+          }
+        }
+      }
+    },
+    "Passi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steps"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passi"
+          }
+        }
+      }
+    },
+    "Passi, battito, sonno, allenamenti, ECG e molto altro: attivi solo i gruppi che vuoi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steps, heart rate, sleep, workouts, ECG and much more: turn on only the groups you want."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passi, battito, sonno, allenamenti, ECG e molto altro: attivi solo i gruppi che vuoi."
+          }
+        }
+      }
+    },
+    "Passi, distanze, energia, piani, mobilità": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steps, distances, energy, flights, mobility"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passi, distanze, energia, piani, mobilità"
+          }
+        }
+      }
+    },
+    "Per provare l'app senza dati e senza server. Se hai inserito un indirizzo, i dati di esempio vengono inviati lì davvero; altrimenti l'invio è solo simulato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To try the app without data or a server. If you entered an address, the sample data is really sent there; otherwise sending is only simulated."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per provare l'app senza dati e senza server. Se hai inserito un indirizzo, i dati di esempio vengono inviati lì davvero; altrimenti l'invio è solo simulato."
+          }
+        }
+      }
+    },
+    "Per togliere un permesso: Impostazioni › App › Salute › Accesso ai dati › %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To revoke a permission: Settings › Apps › Health › Data Access › %@."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per togliere un permesso: Impostazioni › App › Salute › Accesso ai dati › %@."
+          }
+        }
+      }
+    },
+    "Percorsi GPS degli allenamenti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workout GPS routes"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Percorsi GPS degli allenamenti"
+          }
+        }
+      }
+    },
+    "Peso, misure, temperatura, cadute, dati personali": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weight, measurements, temperature, falls, personal details"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peso, misure, temperatura, cadute, dati personali"
+          }
+        }
+      }
+    },
+    "Profondo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deep"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profondo"
+          }
+        }
+      }
+    },
+    "Pronto a partire": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to go"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pronto a partire"
+          }
+        }
+      }
+    },
+    "Prova": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova"
+          }
+        }
+      }
+    },
+    "Prova connessione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test connection"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova connessione"
+          }
+        }
+      }
+    },
+    "Puoi lasciarlo vuoto e configurarlo più tardi nelle Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can leave it empty and set it up later in Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puoi lasciarlo vuoto e configurarlo più tardi nelle Impostazioni."
+          }
+        }
+      }
+    },
+    "Qualcosa non è andato": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualcosa non è andato"
+          }
+        }
+      }
+    },
+    "Quando Salute avrà passi, sonno o battito, li vedrai qui. Restano sul tuo iPhone: qui li legge solo l'app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When Health has steps, sleep or heart rate, you'll see them here. They stay on your iPhone: only the app reads them here."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando Salute avrà passi, sonno o battito, li vedrai qui. Restano sul tuo iPhone: qui li legge solo l'app."
+          }
+        }
+      }
+    },
+    "Questi numeri sono letti sul tuo iPhone e non lasciano il telefono se non verso il server che hai scelto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These numbers are read on your iPhone and leave it only for the server you chose."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questi numeri sono letti sul tuo iPhone e non lasciano il telefono se non verso il server che hai scelto."
+          }
+        }
+      }
+    },
+    "Qui comparirà ogni sincronizzazione, con l'esito e quanti campioni sono partiti.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every sync will appear here, with its result and how many samples were sent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qui comparirà ogni sincronizzazione, con l'esito e quanti campioni sono partiti."
+          }
+        }
+      }
+    },
+    "REM": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REM"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "REM"
+          }
+        }
+      }
+    },
+    "Registrazione scadente": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poor recording"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione scadente"
+          }
+        }
+      }
+    },
+    "Registrazioni ECG con il tracciato completo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ECG recordings with the full waveform"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazioni ECG con il tracciato completo"
+          }
+        }
+      }
+    },
+    "Registro tecnico, senza valori di salute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technical log, no health values"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registro tecnico, senza valori di salute"
+          }
+        }
+      }
+    },
+    "Registro vuoto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log is empty"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registro vuoto"
+          }
+        }
+      }
+    },
+    "Respirazione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Respiratory"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Respirazione"
+          }
+        }
+      }
+    },
+    "Respiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Breathing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Respiro"
+          }
+        }
+      }
+    },
+    "Riduce i dati inviati. Attivalo solo se il tuo server accetta «Content-Encoding: gzip».": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduces the data sent. Turn it on only if your server accepts “Content-Encoding: gzip”."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riduce i dati inviati. Attivalo solo se il tuo server accetta «Content-Encoding: gzip»."
+          }
+        }
+      }
+    },
+    "Righe mostrate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lines shown"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Righe mostrate"
+          }
+        }
+      }
+    },
+    "Riprendi ora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi ora"
+          }
+        }
+      }
+    },
+    "Riproverò da solo tra poco.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll retry on my own shortly."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproverò da solo tra poco."
+          }
+        }
+      }
+    },
+    "Riproverò da solo. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll retry on my own. %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproverò da solo. %@"
+          }
+        }
+      }
+    },
+    "Ritmo sinusale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sinus rhythm"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ritmo sinusale"
+          }
+        }
+      }
+    },
+    "Riuscito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riuscito"
+          }
+        }
+      }
+    },
+    "Rivedi i permessi di Salute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Health permissions"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rivedi i permessi di Salute"
+          }
+        }
+      }
+    },
+    "Salta per ora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip for now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salta per ora"
+          }
+        }
+      }
+    },
+    "Salute non è disponibile su questo dispositivo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health isn't available on this device."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salute non è disponibile su questo dispositivo."
+          }
+        }
+      }
+    },
+    "Salute non è leggibile con l'iPhone bloccato": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health can't be read while the iPhone is locked"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salute non è leggibile con l'iPhone bloccato"
+          }
+        }
+      }
+    },
+    "Salute si può leggere solo con l'iPhone sbloccato. Riprendo da solo appena lo sblocchi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health can only be read while the iPhone is unlocked. I'll resume on my own as soon as you unlock it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salute si può leggere solo con l'iPhone sbloccato. Riprendo da solo appena lo sblocchi."
+          }
+        }
+      }
+    },
+    "Scegli cosa condividere": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose what to share"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli cosa condividere"
+          }
+        }
+      }
+    },
+    "Scegli tu cosa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You choose what"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli tu cosa"
+          }
+        }
+      }
+    },
+    "Sempre in pari": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always up to date"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sempre in pari"
+          }
+        }
+      }
+    },
+    "Sincronizza ora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizza ora"
+          }
+        }
+      }
+    },
+    "Sincronizzazione…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncing…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizzazione…"
+          }
+        }
+      }
+    },
+    "Sintomi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symptoms"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sintomi"
+          }
+        }
+      }
+    },
+    "Sonno": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sleep"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonno"
+          }
+        }
+      }
+    },
+    "Spento di serie: i percorsi rivelano dove vivi e ti alleni. Richiede il gruppo Allenamenti.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off by default: routes reveal where you live and train. Requires the Workouts group."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spento di serie: i percorsi rivelano dove vivi e ti alleni. Richiede il gruppo Allenamenti."
+          }
+        }
+      }
+    },
+    "Sto inviando i tuoi dati al server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending your data to the server"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sto inviando i tuoi dati al server"
+          }
+        }
+      }
+    },
+    "Sto leggendo i dati da Salute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading data from Health"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sto leggendo i dati da Salute"
+          }
+        }
+      }
+    },
+    "Storico": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Storico"
+          }
+        }
+      }
+    },
+    "Storico completo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full history"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Storico completo"
+          }
+        }
+      }
+    },
+    "Sul telefono restano solo impostazioni e registro invii. I dati restano in Salute.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only settings and the sync log stay on the phone. Your data stays in Health."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sul telefono restano solo impostazioni e registro invii. I dati restano in Salute."
+          }
+        }
+      }
+    },
+    "Sul telefono restano solo impostazioni, segnalibri di sincronizzazione e registro invii.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only settings, sync bookmarks and the sync log are kept on the phone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sul telefono restano solo impostazioni, segnalibri di sincronizzazione e registro invii."
+          }
+        }
+      }
+    },
+    "Sveglio": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Awake"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sveglio"
+          }
+        }
+      }
+    },
+    "Tieni l'app aperta: l'iPhone resta acceso finché lo storico non è stato inviato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the app open: the iPhone stays awake until the history is sent."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni l'app aperta: l'iPhone resta acceso finché lo storico non è stato inviato."
+          }
+        }
+      }
+    },
+    "Tipo %lld di %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type %lld of %lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo %lld di %lld"
+          }
+        }
+      }
+    },
+    "Tipo, durata, energia e statistiche degli allenamenti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workout type, duration, energy and statistics"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo, durata, energia e statistiche degli allenamenti"
+          }
+        }
+      }
+    },
+    "Tocca i gruppi che vuoi sincronizzare: nessuno è scelto in partenza. Salute ti chiederà conferma voce per voce e potrai aggiungerne altri quando vuoi, da Impostazioni.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the groups you want to sync: none is selected to start with. Health will ask you to confirm item by item, and you can add more any time from Settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tocca i gruppi che vuoi sincronizzare: nessuno è scelto in partenza. Salute ti chiederà conferma voce per voce e potrai aggiungerne altri quando vuoi, da Impostazioni."
+          }
+        }
+      }
+    },
+    "Token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token"
+          }
+        }
+      }
+    },
+    "Token (facoltativo)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token (optional)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token (facoltativo)"
+          }
+        }
+      }
+    },
+    "Token al sicuro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token kept safe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token al sicuro"
+          }
+        }
+      }
+    },
+    "Tutti i dati autorizzati verranno reinviati dall'inizio. Il server riceverà dei duplicati: gli uuid permettono di riconoscerli.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All authorized data will be sent again from the beginning. The server will receive duplicates: the uuids let it recognize them."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutti i dati autorizzati verranno reinviati dall'inizio. Il server riceverà dei duplicati: gli uuid permettono di riconoscerli."
+          }
+        }
+      }
+    },
+    "Tutto sincronizzato": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All synced"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutto sincronizzato"
+          }
+        }
+      }
+    },
+    "Udito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hearing"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Udito"
+          }
+        }
+      }
+    },
+    "Ultime righe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest lines"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultime righe"
+          }
+        }
+      }
+    },
+    "Ultimi 7 giorni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last 7 days"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 7 giorni"
+          }
+        }
+      }
+    },
+    "Ultimo invio %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last sync %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimo invio %@"
+          }
+        }
+      }
+    },
+    "Ultimo invio al server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last sent to server"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimo invio al server"
+          }
+        }
+      }
+    },
+    "Utile se il server ha perso i dati. Il prossimo invio ripartirà dal primo campione mai registrato.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Useful if the server lost its data. The next sync will start again from the very first sample."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utile se il server ha perso i dati. Il prossimo invio ripartirà dal primo campione mai registrato."
+          }
+        }
+      }
+    },
+    "Valore": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Value"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valore"
+          }
+        }
+      }
+    },
+    "Variabilità (HRV)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Variability (HRV)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Variabilità (HRV)"
+          }
+        }
+      }
+    },
+    "Vengono conservati gli ultimi %lld invii.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last %lld syncs are kept."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vengono conservati gli ultimi %lld invii."
+          }
+        }
+      }
+    },
+    "Versione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versione"
+          }
+        }
+      }
+    },
+    "bpm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bpm"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bpm"
+          }
+        }
+      }
+    },
+    "bpm medi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "avg bpm"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bpm medi"
+          }
+        }
+      }
+    },
+    "campioni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "samples"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "campioni"
+          }
+        }
+      }
+    },
+    "campioni oggi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "samples today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "campioni oggi"
+          }
+        }
+      }
+    },
+    "consegnati": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "delivered"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "consegnati"
+          }
+        }
+      }
+    },
+    "destinazione": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "destination"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "destinazione"
+          }
+        }
+      }
+    },
+    "di sonno": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "asleep"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "di sonno"
+          }
+        }
+      }
+    },
+    "facoltativo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "optional"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "facoltativo"
+          }
+        }
+      }
+    },
+    "in attesa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "waiting"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in attesa"
+          }
+        }
+      }
+    },
+    "invii": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syncs"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "invii"
+          }
+        }
+      }
+    },
+    "invii oggi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syncs today"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "invii oggi"
+          }
+        }
+      }
+    },
+    "kcal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kcal"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kcal"
+          }
+        }
+      }
+    },
+    "media": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "average"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "media"
+          }
+        }
+      }
+    },
+    "ms": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ms"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ms"
+          }
+        }
+      }
+    },
+    "ne mancano %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld to go"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ne mancano %lld"
+          }
+        }
+      }
+    },
+    "non riusciti": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "failed"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "non riusciti"
+          }
+        }
+      }
+    },
+    "obiettivo %@ kcal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "goal %@ kcal"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "obiettivo %@ kcal"
+          }
+        }
+      }
+    },
+    "obiettivo raggiunto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "goal reached"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "obiettivo raggiunto"
+          }
+        }
+      }
+    },
+    "passi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "steps"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "passi"
+          }
+        }
+      }
+    },
+    "resp/min": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "br/min"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "resp/min"
+          }
+        }
+      }
+    },
+    "ultima misura": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "latest reading"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ultima misura"
+          }
+        }
+      }
+    },
+    "ultimi 7 giorni": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "last 7 days"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ultimi 7 giorni"
+          }
+        }
+      }
+    },
+    "·": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "·"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "·"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
