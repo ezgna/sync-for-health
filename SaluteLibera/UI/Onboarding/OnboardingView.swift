@@ -6,6 +6,9 @@ struct OnboardingView: View {
     @State private var page = AppEnvironment.onboardingPage
     @State private var authorized = false
     @State private var authError: String?
+    @State private var draftEndpoint = ""
+    @State private var draftToken = ""
+    @State private var isFinishing = false
     /// Gruppi scelti nell'introduzione: nessuno di serie.
     @State private var chosen: Set<DataGroup> = []
     @Environment(\.colorScheme) private var scheme
@@ -31,6 +34,15 @@ struct OnboardingView: View {
         }
         .foregroundStyle(.white)
         .tint(.white)
+        .allowsHitTesting(!isFinishing)
+        .onAppear {
+            draftEndpoint = settings.endpoint; draftToken = settings.token
+            chosen = settings.enabledGroups
+        }
+        .onChange(of: chosen) { _, _ in authorized = false }
+        .onChange(of: draftEndpoint) { _, value in
+            if value != settings.endpoint { draftToken = "" }
+        }
     }
 
     // MARK: Pagine
@@ -47,7 +59,7 @@ struct OnboardingView: View {
         } content: {
             VStack(alignment: .leading, spacing: 18) {
                 Feature(symbol: "arrow.triangle.2.circlepath", title: "Sempre in pari",
-                        text: "Invia solo le novità, anche in background, appena Salute le registra.")
+                        text: "iOSが実行を許可した際に差分を送ります。時刻や頻度は保証されません。")
                 Feature(symbol: "square.stack.3d.up.fill", title: "Scegli tu cosa",
                         text: "Passi, battito, sonno, allenamenti, ECG e molto altro: attivi solo i gruppi che vuoi.")
                 Feature(symbol: "gift.fill", title: "Gratuita, senza pubblicità",
@@ -118,8 +130,7 @@ struct OnboardingView: View {
     }
 
     private var destination: some View {
-        @Bindable var settings = settings
-        return OnboardingPage {
+        OnboardingPage {
             ZStack {
                 Circle().fill(.white.opacity(0.14)).frame(width: 132, height: 132)
                 Image(systemName: "server.rack")
@@ -134,7 +145,7 @@ struct OnboardingView: View {
         } content: {
             VStack(spacing: 12) {
                 GlassField(symbol: "link") {
-                    TextField("", text: $settings.endpoint,
+                    TextField("", text: $draftEndpoint,
                               prompt: Text(verbatim: (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("it") ? "https://il-tuo-server.it/salute" : "https://your-server.example/health").foregroundStyle(.white.opacity(0.75)))
                         .keyboardType(.URL)
                         .textContentType(.URL)
@@ -142,13 +153,14 @@ struct OnboardingView: View {
                         .autocorrectionDisabled()
                 }
                 GlassField(symbol: "key.fill") {
-                    SecureField("", text: $settings.token,
-                                prompt: Text("Token (facoltativo)").foregroundStyle(.white.opacity(0.75)))
+                    SecureField("", text: $draftToken,
+                                prompt: Text("必須トークン").foregroundStyle(.white.opacity(0.75)))
                 }
-                ConnectionTestRow(endpoint: settings.endpoint, token: settings.token, gzip: settings.gzip, onGlass: true)
+                ConnectionTestRow(endpoint: draftEndpoint, token: draftToken, gzip: settings.gzip, onGlass: true)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 13)
                     .glassEffect(.clear.tint(.black.opacity(0.10)).interactive(), in: .rect(cornerRadius: 18))
+                if let authError { Text(authError).font(.footnote) }
                 Text("Puoi lasciarlo vuoto e configurarlo più tardi nelle Impostazioni.")
                     .font(.footnote)
                     .opacity(0.8)
@@ -156,6 +168,7 @@ struct OnboardingView: View {
                     .padding(.top, 4)
                 Button {
                     settings.demoMode = true
+                    settings.syncEnabled = true
                     withAnimation(.spring(duration: 0.6)) { settings.onboardingDone = true }
                 } label: {
                     Label("Non hai un server? Prova con dati di esempio", systemImage: "sparkles")
@@ -192,6 +205,7 @@ struct OnboardingView: View {
                     .padding(.vertical, 8)
                     .contentTransition(.interpolate)
             }
+            .disabled(isFinishing)
             .buttonStyle(.glassProminent)
             .tint(.white)
             .sensoryFeedback(.selection, trigger: page)
@@ -206,32 +220,51 @@ struct OnboardingView: View {
             if authorized { "Continua" }
             else if chosen.isEmpty { "Salta per ora" }
             else { "Consenti accesso a Salute" }
-        case 3: settings.endpointURL == nil ? "Configura più tardi" : "Inizia"
+        case 3: AppSettings.validURL(draftEndpoint) == nil ? "Configura più tardi" : "Inizia"
         default: "Continua"
         }
     }
 
     private func advance() {
+        guard !isFinishing else { return }
         switch page {
-        case 2 where !authorized && !chosen.isEmpty:
+        case 2:
             settings.enabledGroups = chosen
+            guard !chosen.isEmpty && !authorized else { page = 3; return }
+            isFinishing = true
             Task {
+                defer { isFinishing = false }
                 do {
                     try await Health.requestAuthorization(groups: chosen, includeRoutes: settings.includeRoutes)
                     authError = nil
-                } catch {
-                    authError = error.localizedDescription
-                }
-                authorized = true
-                try? await Task.sleep(for: .milliseconds(500))
-                page = 3
+                    authorized = true
+                    page = 3
+                } catch { authError = "ヘルスケアの権限を確認できませんでした。ロック解除後に再試行してください。" }
             }
         case pages - 1:
-            withAnimation(.spring(duration: 0.6)) { settings.onboardingDone = true }
+            // TabView can reach this page by swiping; apply the final selection,
+            // including an empty selection, and request permission here as well.
+            let groups = chosen, address = draftEndpoint, secret = draftToken
+            isFinishing = true
+            Task {
+                defer { isFinishing = false }
+                do {
+                    settings.enabledGroups = groups
+                    if !groups.isEmpty && !authorized {
+                        try await Health.requestAuthorization(groups: groups, includeRoutes: settings.includeRoutes)
+                        authorized = true
+                    }
+                    try settings.saveConnection(endpoint: address, token: secret)
+                    settings.syncEnabled = settings.connectionReady
+                    authError = nil
+                    withAnimation(.spring(duration: 0.6)) { settings.onboardingDone = true }
+                } catch { authError = error.localizedDescription }
+            }
         default:
             page += 1
         }
     }
+
 }
 
 // MARK: - Componenti

@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(SyncCenter.self) private var center
+    @State private var draftEndpoint = ""
+    @State private var draftToken = ""
+    @State private var connectionMessage: String?
     @State private var confirmReset = false
     @State private var authMessage: LocalizedStringKey?
     @State private var showDiagnostics = AppEnvironment.openDiagnostics
@@ -14,7 +17,7 @@ struct SettingsView: View {
             Form {
                 Section {
                     LabeledField(symbol: "link", title: "Indirizzo") {
-                        TextField(text: $settings.endpoint, prompt: Text(verbatim: (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("it") ? "https://il-tuo-server.it/salute" : "https://your-server.example/health")) {
+                        TextField(text: $draftEndpoint, prompt: Text(verbatim: (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("it") ? "https://il-tuo-server.it/salute" : "https://your-server.example/health")) {
                             Text("Indirizzo")
                         }
                             .keyboardType(.URL)
@@ -23,15 +26,31 @@ struct SettingsView: View {
                             .autocorrectionDisabled()
                     }
                     LabeledField(symbol: "key.fill", title: "Token") {
-                        SecureField("facoltativo", text: $settings.token)
+                        SecureField("必須トークン", text: $draftToken)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                     }
-                    ConnectionTestRow(endpoint: settings.endpoint, token: settings.token, gzip: settings.gzip)
+                    ConnectionTestRow(endpoint: draftEndpoint, token: draftToken, gzip: settings.gzip)
+                    Button("接続設定を保存") {
+                        do {
+                            try settings.saveConnection(endpoint: draftEndpoint, token: draftToken)
+                            draftEndpoint = settings.endpoint
+                            draftToken = settings.token
+                            connectionMessage = "保存しました。送信先が変わった場合は履歴を最初から再送します。"
+                        } catch { connectionMessage = error.localizedDescription }
+                    }
+                    if let connectionMessage { Text(connectionMessage).font(.footnote) }
                 } header: {
                     Text("Destinazione")
                 } footer: {
-                    Text("Il token è custodito nel Portachiavi e inviato come «Authorization: Bearer». Se l'indirizzo contiene già un parametro come ?t=…, viene usato così com'è.")
+                    Text("URLとトークンは保存ボタンで一緒に確定し、キーチェーンへ保存します。送信先URLを変更したら、新しいトークンを入力してください。")
+                }
+
+                Section {
+                    Toggle("同期を有効にする", isOn: $settings.syncEnabled)
+                        .disabled(!settings.connectionReady && !settings.demoMode)
+                } footer: {
+                    Text("OFFにすると実行中の送信と自動同期を停止します。Mac停止中の未送信分は、接続できた次回に再試行します。")
                 }
 
                 Section {
@@ -102,10 +121,11 @@ struct SettingsView: View {
                                    detail: "Dati di esempio inventati, Salute non viene letta")
                     }
                 } footer: {
-                    Text("Per provare l'app senza dati e senza server. Se hai inserito un indirizzo, i dati di esempio vengono inviati lì davvero; altrimenti l'invio è solo simulato.")
+                    Text("デモはiPhone内だけで動きます。合成データをサーバーへ送信しません。")
                 }
 
                 Section {
+                    Toggle("診断ログをMacへ送信", isOn: $settings.diagnosticsEnabled)
                     NavigationLink {
                         DiagnosticsView()
                     } label: {
@@ -126,7 +146,7 @@ struct SettingsView: View {
                     Link(destination: AppInfo.sourceURL) {
                         Label("Codice sorgente (licenza MIT)", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
-                    LabeledContent("Versione", value: "\(Uploader.appVersion) · protocollo v1")
+                    LabeledContent("Versione", value: "\(Uploader.appVersion) · protocollo v2")
                 } header: {
                     Text("Informazioni")
                 } footer: {
@@ -150,18 +170,38 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $showDiagnostics) { DiagnosticsView() }
             .confirmationDialog("Inviare di nuovo tutto lo storico?", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("Invia tutto lo storico", role: .destructive) {
-                    AnchorStore.shared.reset()
-                    UserDefaults.standard.set(false, forKey: AppSettings.Keys.characteristicsSent)
-                    UserDefaults.standard.set(false, forKey: AppSettings.Keys.historyComplete)
-                    DiagLog.info("sync", "segnalibri azzerati dall'utente: si reinvia tutto lo storico")
-                    Task { await SyncCoordinator.shared.request(.storico) }
+                    do {
+                        try settings.requestHistoryReplay()
+                        Task { await SyncCoordinator.shared.request(.storico) }
+                    } catch { connectionMessage = "同期位置を初期化できませんでした。空き容量と端末のロック状態を確認してください。" }
                 }
                 Button("Annulla", role: .cancel) {}
             } message: {
                 Text("Tutti i dati autorizzati verranno reinviati dall'inizio. Il server riceverà dei duplicati: gli uuid permettono di riconoscerli.")
             }
+            .onAppear {
+                settings.reloadCredentials()
+                draftEndpoint = settings.endpoint
+                draftToken = settings.token
+            }
+            .onChange(of: draftEndpoint) { _, value in
+                if value != settings.endpoint { draftToken = "" }
+                connectionMessage = nil
+            }
             .onChange(of: settings.enabledGroups) { _, groups in
                 HealthBackground.restart(groups: groups)
+            }
+            .onChange(of: settings.includeRoutes) { _, _ in
+                HealthBackground.restart(groups: settings.enabledGroups)
+            }
+            .onChange(of: settings.syncEnabled) { _, on in
+                if on {
+                    HealthBackground.start(groups: settings.enabledGroups)
+                    center.syncNow(.manuale)
+                } else { HealthBackground.stop() }
+            }
+            .onChange(of: settings.demoMode) { _, _ in
+                HealthBackground.restart(groups: settings.enabledGroups)
             }
             }
         }
@@ -193,7 +233,9 @@ struct SettingsView: View {
         Task {
             do {
                 try await Health.requestAuthorization(groups: groups, includeRoutes: settings.includeRoutes)
-                authMessage = "Fatto. Salute non rivela quali tipi hai concesso: i dati non autorizzati semplicemente non partono."
+                try settings.requestHistoryReplay()
+                if settings.syncEnabled { center.syncNow(.manuale) }
+                authMessage = "権限の確認が終わりました。次回は許可された履歴を再走査します。HealthKitは読取許可の有無をアプリへ公開しません。"
             } catch {
                 authMessage = "Impossibile chiedere i permessi: \(error.localizedDescription)"
             }
@@ -277,12 +319,19 @@ struct ConnectionTestRow: View {
 
     private enum TestState: Equatable { case idle, running, ok(Int), failed(String) }
     @State private var state: TestState = .idle
+    @State private var testTask: Task<Void, Never>?
+    @State private var generation = UUID()
 
     var body: some View {
         Button {
             state = .running
-            Task {
-                switch await ConnectionTest.run(endpoint: endpoint, token: token, gzip: gzip) {
+            let current = UUID()
+            generation = current
+            let address = endpoint, secret = token, compressed = gzip
+            testTask = Task {
+                let result = await ConnectionTest.run(endpoint: address, token: secret, gzip: compressed)
+                guard !Task.isCancelled, generation == current else { return }
+                switch result {
                 case .success(let bytes): state = .ok(bytes)
                 case .failure(let e): state = .failed(e.localizedDescription)
                 }
@@ -327,6 +376,17 @@ struct ConnectionTestRow: View {
             default: nil
             }
         }
-        .onChange(of: endpoint) { state = .idle }
+        .onChange(of: endpoint) { resetTest() }
+        .onChange(of: token) { resetTest() }
+        .onChange(of: gzip) { resetTest() }
+        .onDisappear { resetTest() }
     }
+
+    private func resetTest() {
+        generation = UUID()
+        testTask?.cancel()
+        testTask = nil
+        state = .idle
+    }
+
 }

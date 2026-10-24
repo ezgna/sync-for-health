@@ -80,6 +80,7 @@ enum EntryKind: Sendable, Equatable {
     /// Campione quantitativo con l'unità canonica usata nel payload.
     case quantity(unit: String)
     case category
+    case correlation
     case workout
     case electrocardiogram
     case audiogram
@@ -106,6 +107,8 @@ struct CatalogEntry: Sendable, Identifiable, Hashable {
             return HKObjectType.quantityType(forIdentifier: HKQuantityTypeIdentifier(rawValue: identifier))
         case .category:
             return HKObjectType.categoryType(forIdentifier: HKCategoryTypeIdentifier(rawValue: identifier))
+        case .correlation:
+            return HKObjectType.correlationType(forIdentifier: HKCorrelationTypeIdentifier(rawValue: identifier))
         case .workout:
             return HKObjectType.workoutType()
         case .electrocardiogram:
@@ -336,6 +339,8 @@ enum HealthCatalog {
         out.append(CatalogEntry(identifier: "HKDataTypeIdentifierElectrocardiogram", group: .ecg, kind: .electrocardiogram, immediate: true))
         out.append(CatalogEntry(identifier: "HKDataTypeIdentifierAudiogram", group: .udito, kind: .audiogram, immediate: false))
         out.append(CatalogEntry(identifier: "HKDataTypeIdentifierStateOfMind", group: .mindfulness, kind: .stateOfMind, immediate: true))
+        out.append(CatalogEntry(identifier: HKCorrelationTypeIdentifier.bloodPressure.rawValue,
+                                group: .cuore, kind: .correlation, immediate: false))
         return out
     }()
 
@@ -372,7 +377,10 @@ enum HealthCatalog {
     /// (data di nascita, sesso…) solo con il gruppo Corpo; il riepilogo degli anelli con Attività;
     /// i percorsi GPS solo con Allenamenti e solo se l'utente li ha accesi (spenti di serie).
     static func readTypes(groups: Set<DataGroup>, includeRoutes: Bool) -> Set<HKObjectType> {
-        var set = Set<HKObjectType>(entries(in: groups).compactMap(\.sampleType))
+        // Le correlazioni usano i permessi dei campioni contenuti. Non hanno
+        // un'autorizzazione separata: chiediamo sistolica e diastolica già nel gruppo Cuore.
+        var set = Set<HKObjectType>(entries(in: groups)
+            .filter { $0.kind != .correlation }.compactMap(\.sampleType))
         if groups.contains(.corpo) { set.formUnion(characteristicTypes) }
         if groups.contains(.attivita) { set.insert(HKObjectType.activitySummaryType()) }
         if includeRoutes, groups.contains(.allenamenti) { set.insert(HKSeriesType.workoutRoute()) }

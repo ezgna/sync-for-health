@@ -2,130 +2,220 @@ import Foundation
 import Observation
 import Security
 
-/// Impostazioni dell'utente (UserDefaults) — il token sta nel Portachiavi.
-@MainActor
-@Observable
-final class AppSettings {
-    static let shared = AppSettings()
+/// URL and credential are saved together, so a crash cannot pair a token with another host.
+struct SavedConnection: Codable, Equatable {
+    var endpoint: String
+    var token: String
+    var connectionID: String
+}
 
-    private let defaults = UserDefaults.standard
-
-    var endpoint: String { didSet { defaults.set(endpoint, forKey: Keys.endpoint) } }
-    var gzip: Bool { didSet { defaults.set(gzip, forKey: Keys.gzip) } }
-    var includeRoutes: Bool { didSet { defaults.set(includeRoutes, forKey: Keys.routes) } }
-    var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: Keys.onboarding) } }
-    /// Modalità dimostrativa: dati sintetici, nessuna lettura di Salute, nessun invio reale
-    /// se non c'è un indirizzo. Pensata per provare l'app (e per la revisione di Apple).
-    var demoMode: Bool {
-        didSet {
-            defaults.set(demoMode, forKey: Keys.demo)
-            DemoMode.apply(demoMode)
-        }
-    }
-    var enabledGroups: Set<DataGroup> {
-        didSet { defaults.set(enabledGroups.map(\.rawValue).sorted(), forKey: Keys.groups) }
-    }
-    var token: String {
-        didSet { Keychain.set(token.trimmingCharacters(in: .whitespacesAndNewlines), for: Keys.token) }
+enum ConnectionPolicy {
+    static func url(_ value: String) -> URL? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var parts = URLComponents(string: value),
+              parts.scheme?.lowercased() == "https", let host = parts.host, !host.isEmpty,
+              parts.user == nil, parts.password == nil, parts.query == nil,
+              parts.fragment == nil else { return nil }
+        guard !host.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) }) else { return nil }
+        if let port = parts.port, !(1...65535).contains(port) { return nil }
+        parts.scheme = "https"
+        parts.host = host.lowercased()
+        if parts.port == 443 { parts.port = nil }
+        return parts.url
     }
 
-    private init() {
-        endpoint = defaults.string(forKey: Keys.endpoint) ?? ""
-        gzip = defaults.bool(forKey: Keys.gzip)
-        includeRoutes = defaults.bool(forKey: Keys.routes)
-        onboardingDone = defaults.bool(forKey: Keys.onboarding)
-        demoMode = defaults.bool(forKey: Keys.demo)
-        if let raw = defaults.stringArray(forKey: Keys.groups) {
-            enabledGroups = Set(raw.compactMap(DataGroup.init(rawValue:)))
-        } else {
-            // Nessun gruppo di serie: l'utente sceglie cosa condividere.
-            enabledGroups = []
-        }
-        token = Keychain.get(Keys.token) ?? ""
-    }
-
-    var endpointURL: URL? { Self.validURL(endpoint) }
-
-    /// Accetta https ovunque; http solo per indirizzi locali (test in LAN o sul Mac).
-    nonisolated static func validURL(_ s: String) -> URL? {
-        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
-              let host = url.host(), !host.isEmpty else { return nil }
-        if scheme == "https" { return url }
-        if scheme == "http", isLocal(host) { return url }
-        return nil
-    }
-
-    nonisolated static func isLocal(_ host: String) -> Bool {
-        host == "localhost" || host.hasSuffix(".local") || host.hasPrefix("127.")
-            || host.hasPrefix("192.168.") || host.hasPrefix("10.") || isPrivate172(host)
-    }
-
-    /// 172.16.0.0/12 soltanto (172.16.x.x – 172.31.x.x).
-    nonisolated static func isPrivate172(_ host: String) -> Bool {
-        let parts = host.split(separator: ".")
-        guard parts.count == 4, parts[0] == "172", let second = Int(parts[1]) else { return false }
-        return (16...31).contains(second)
-    }
-
-    var snapshot: SettingsSnapshot {
-        SettingsSnapshot(endpoint: endpointURL, token: token, gzip: gzip,
-                         includeRoutes: includeRoutes, groups: enabledGroups)
-    }
-
-    enum Keys {
-        static let endpoint = "endpoint"
-        static let gzip = "gzip"
-        static let routes = "includiPercorsi"
-        static let onboarding = "onboardingCompletato"
-        static let groups = "gruppiAttivi"
-        static let token = "token"
-        static let demo = "modalitaDemo"
-        static let characteristicsSent = "caratteristicheInviate"
-        /// Diventa vero al primo invio completato fino in fondo (storico tutto consegnato).
-        static let historyComplete = "storicoCompleto"
+    static func token(_ value: String) -> String? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (32...256).contains(value.utf8.count),
+              value.unicodeScalars.allSatisfy({ (0x21...0x7e).contains($0.value) }) else { return nil }
+        return value
     }
 }
 
-/// Copia immutabile delle impostazioni, da passare al motore di sincronizzazione.
+enum SettingsError: LocalizedError {
+    case invalidConnection, credentialsUnavailable
+    var errorDescription: String? {
+        switch self {
+        case .invalidConnection: "HTTPS URL（認証情報・クエリ・フラグメントなし）と、32〜256文字の半角英数字・記号のトークンを指定してください。"
+        case .credentialsUnavailable: "接続設定を安全に保存できませんでした。iPhoneをロック解除して再試行してください。"
+        }
+    }
+}
+
+@MainActor @Observable
+final class AppSettings {
+    static let shared = AppSettings()
+    private let defaults = UserDefaults.standard
+    private var connectionID: String
+    private var credentialsLoaded: Bool
+    private(set) var endpoint: String
+    private(set) var token: String
+    private(set) var destinationID: String
+    let installationID: String
+    private(set) var revision = UUID()
+
+    var gzip: Bool { didSet { defaults.set(gzip, forKey: Keys.gzip); changed() } }
+    var includeRoutes: Bool { didSet { defaults.set(includeRoutes, forKey: Keys.routes); changed(resetHistory: true) } }
+    var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: Keys.onboarding) } }
+    var syncEnabled: Bool { didSet { defaults.set(syncEnabled, forKey: Keys.enabled); changed() } }
+    var diagnosticsEnabled: Bool { didSet { defaults.set(diagnosticsEnabled, forKey: Keys.diagnostics); changed() } }
+    var demoMode: Bool {
+        didSet { defaults.set(demoMode, forKey: Keys.demo); changed(); DemoMode.apply(demoMode) }
+    }
+    var enabledGroups: Set<DataGroup> {
+        didSet {
+            defaults.set(enabledGroups.map(\.rawValue).sorted(), forKey: Keys.groups)
+            changed(resetHistory: true)
+        }
+    }
+
+    private init() {
+        let d = UserDefaults.standard
+        let saved: SavedConnection?
+        do { saved = try Keychain.connection(); credentialsLoaded = true }
+        catch { saved = nil; credentialsLoaded = false }
+        endpoint = saved?.endpoint ?? ""
+        token = saved?.token ?? ""
+        connectionID = saved?.connectionID ?? UUID().uuidString
+        installationID = d.string(forKey: Keys.installation) ?? UUID().uuidString
+        destinationID = d.string(forKey: Keys.destination) ?? UUID().uuidString
+        gzip = d.bool(forKey: Keys.gzip)
+        includeRoutes = d.bool(forKey: Keys.routes)
+        onboardingDone = d.bool(forKey: Keys.onboarding)
+        syncEnabled = d.bool(forKey: Keys.enabled)
+        diagnosticsEnabled = d.bool(forKey: Keys.diagnostics)
+        demoMode = d.bool(forKey: Keys.demo)
+        enabledGroups = Set((d.stringArray(forKey: Keys.groups) ?? []).compactMap(DataGroup.init(rawValue:)))
+        d.set(installationID, forKey: Keys.installation)
+        refreshNamespace()
+    }
+
+    var endpointURL: URL? { Self.validURL(endpoint) }
+    var connectionReady: Bool { endpointURL != nil && ConnectionPolicy.token(token) != nil }
+    nonisolated static func validURL(_ value: String) -> URL? { ConnectionPolicy.url(value) }
+
+    func saveConnection(endpoint value: String, token secret: String) throws {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            guard secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SettingsError.invalidConnection }
+            try Keychain.save(nil)
+            credentialsLoaded = true
+            endpoint = ""; token = ""; connectionID = UUID().uuidString
+        } else {
+            guard let url = ConnectionPolicy.url(value), let normalized = ConnectionPolicy.token(secret) else { throw SettingsError.invalidConnection }
+            if url.absoluteString == endpoint && normalized == token { return }
+            let next = SavedConnection(endpoint: url.absoluteString, token: normalized, connectionID: UUID().uuidString)
+            try Keychain.save(next)
+            credentialsLoaded = true
+            endpoint = next.endpoint; token = next.token; connectionID = next.connectionID
+        }
+        changed(resetHistory: true)
+    }
+
+    /// Retry Keychain access after the first unlock; never overwrite unavailable credentials.
+    func reloadCredentials() {
+        guard let saved = try? Keychain.connection(),
+              saved.endpoint != endpoint || saved.token != token || saved.connectionID != connectionID else { return }
+        credentialsLoaded = true
+        endpoint = saved.endpoint; token = saved.token; connectionID = saved.connectionID
+        changed(resetHistory: true)
+    }
+
+    func requestHistoryReplay() throws {
+        defaults.removeObject(forKey: Keys.namespaceSignature)
+        changed(resetHistory: true)
+        // Also recover an unreadable cursor file. This is an explicit full replay.
+        try AnchorStore.shared.reset()
+    }
+
+    private func refreshNamespace() {
+        // A boot before first unlock must not rotate an otherwise valid cursor.
+        guard credentialsLoaded else { return }
+        let signature = [connectionID, enabledGroups.map(\.rawValue).sorted().joined(separator: ","),
+                         includeRoutes ? "routes" : "no-routes"].joined(separator: "|")
+        if defaults.string(forKey: Keys.namespaceSignature) != signature {
+            destinationID = UUID().uuidString
+            defaults.set(destinationID, forKey: Keys.destination)
+            defaults.set(signature, forKey: Keys.namespaceSignature)
+            defaults.set(false, forKey: Keys.historyComplete)
+        }
+    }
+
+    private func changed(resetHistory: Bool = false) {
+        revision = UUID()
+        if resetHistory { refreshNamespace() }
+        let currentRevision = revision
+        Task {
+            await SyncCoordinator.shared.cancelStale(revision: currentRevision)
+            await DiagShipper.shared.cancelStale(revision: currentRevision)
+        }
+    }
+
+    func isCurrent(_ snapshot: SettingsSnapshot) -> Bool {
+        syncEnabled && snapshot.syncEnabled && revision == snapshot.revision && destinationID == snapshot.destinationID
+    }
+
+    var snapshot: SettingsSnapshot {
+        SettingsSnapshot(endpoint: endpointURL, token: token, gzip: gzip, includeRoutes: includeRoutes,
+                         groups: enabledGroups, destinationID: destinationID, installationID: installationID,
+                         revision: revision, syncEnabled: syncEnabled, diagnosticsEnabled: diagnosticsEnabled)
+    }
+
+    enum Keys {
+        static let endpoint = "endpoint", token = "token", gzip = "gzip", routes = "includiPercorsi"
+        static let onboarding = "onboardingCompletato", groups = "gruppiAttivi", demo = "modalitaDemo"
+        static let characteristicsSent = "caratteristicheInviate", historyComplete = "storicoCompleto"
+        static let enabled = "bridge.syncEnabled", diagnostics = "bridge.diagnosticsEnabled"
+        static let installation = "bridge.installationID", destination = "bridge.destinationID"
+        static let namespaceSignature = "bridge.namespaceSignature"
+    }
+}
+
 struct SettingsSnapshot: Sendable {
     let endpoint: URL?
     let token: String
     let gzip: Bool
     let includeRoutes: Bool
     let groups: Set<DataGroup>
+    var destinationID = UUID().uuidString
+    var installationID = UUID().uuidString
+    var revision = UUID()
+    var syncEnabled = true
+    var diagnosticsEnabled = false
 }
 
-/// Accesso minimale al Portachiavi per il token.
 enum Keychain {
-    private static let service = "it.vcnngr.syncforhealth"
-
-    static func set(_ value: String, for account: String) {
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(base as CFDictionary)
-        guard !value.isEmpty else { return }
-        var add = base
-        add[kSecValueData as String] = Data(value.utf8)
-        // Leggibile anche in background dopo il primo sblocco, mai sincronizzato su iCloud.
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(add as CFDictionary, nil)
+    private static var service: String { (Bundle.main.bundleIdentifier ?? "app.ezgna.healthbridge") + ".connection" }
+    private static var base: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+         kSecAttrAccount as String: "connection-v2"]
     }
-
-    static func get(_ account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var out: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess,
-              let data = out as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+    static func save(_ connection: SavedConnection?) throws {
+        guard let connection else {
+            let status = SecItemDelete(base as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else { throw SettingsError.credentialsUnavailable }
+            return
+        }
+        let data = try JSONEncoder().encode(connection)
+        let values: [String: Any] = [kSecValueData as String: data,
+                                    kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        let status = SecItemUpdate(base as CFDictionary, values as CFDictionary)
+        if status == errSecItemNotFound {
+            var attributes = base
+            attributes.merge(values) { _, new in new }
+            guard SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess else { throw SettingsError.credentialsUnavailable }
+        } else if status != errSecSuccess { throw SettingsError.credentialsUnavailable }
+    }
+    static func connection() throws -> SavedConnection? {
+        var query = base
+        query[kSecReturnData as String] = true; query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data,
+              let saved = try? JSONDecoder().decode(SavedConnection.self, from: data),
+              ConnectionPolicy.url(saved.endpoint) != nil, ConnectionPolicy.token(saved.token) == saved.token,
+              UUID(uuidString: saved.connectionID) != nil else { throw SettingsError.credentialsUnavailable }
+        return saved
     }
 }

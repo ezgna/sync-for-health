@@ -1,34 +1,74 @@
 {
-  "sourceLanguage" : "it",
-  "strings" : {
-    "CFBundleDisplayName" : {
-      "comment" : "Bundle display name",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health" } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health" } }
+  "sourceLanguage": "it",
+  "strings": {
+    "CFBundleDisplayName": {
+      "comment": "Bundle display name",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge"
+          }
+        }
       }
     },
-    "CFBundleName" : {
-      "comment" : "Bundle name",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health" } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health" } }
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge"
+          }
+        }
       }
     },
-    "NSHealthShareUsageDescription" : {
-      "comment" : "Privacy - Health Share Usage Description",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health reads only the Health data you authorize and sends it exclusively to the server you set up. Nobody else receives it: no ads, no analytics, no iCloud." } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health legge solo i dati di Salute che autorizzi e li invia esclusivamente al server che hai indicato tu. Nessun altro li riceve: niente pubblicità, niente analisi, niente iCloud." } }
+    "NSHealthShareUsageDescription": {
+      "comment": "Privacy - Health Share Usage Description",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge reads only the Health data you authorize and sends it exclusively to the server you set up. Nobody else receives it: no ads, no analytics, no iCloud."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge legge solo i dati di Salute che autorizzi e li invia esclusivamente al server che hai indicato tu. Nessun altro li riceve: niente pubblicità, niente analisi, niente iCloud."
+          }
+        }
       }
     },
-    "NSHealthUpdateUsageDescription" : {
-      "comment" : "Privacy - Health Update Usage Description",
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health does not write any data to Health." } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sync for Health non scrive dati in Salute." } }
+    "NSHealthUpdateUsageDescription": {
+      "comment": "Privacy - Health Update Usage Description",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge does not write any data to Health."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthBridge non scrive dati in Salute."
+          }
+        }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

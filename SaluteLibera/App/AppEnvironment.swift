@@ -40,11 +40,11 @@ enum AppInfo {
     static var name: String {
         Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] as? String
             ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-            ?? "Sync for Health"
+            ?? "HealthBridge"
     }
     /// Informativa sulla privacy e pagina di supporto (sito statico).
-    static let privacyURL = URL(string: "https://vcnngr.github.io/sync-for-health/privacy.html")!
-    static let supportURL = URL(string: "https://vcnngr.github.io/sync-for-health/")!
+    static let privacyURL = URL(string: "https://github.com/ezgna/sync-for-health/blob/main/docs/HEALTHBRIDGE.md")!
+    static let supportURL = URL(string: "https://github.com/ezgna/sync-for-health")!
     /// Codice sorgente pubblico (licenza MIT).
-    static let sourceURL = URL(string: "https://github.com/vcnngr/sync-for-health")!
+    static let sourceURL = URL(string: "https://github.com/ezgna/sync-for-health")!
 }

@@ -9,6 +9,7 @@ struct SyncHero: View {
     private enum Mood { case ok, syncing, error, setup, waiting, paused, locked }
 
     private var mood: Mood {
+        if !settings.syncEnabled { return .paused }
         if center.isSyncing { return .syncing }
         if settings.endpointURL == nil && !(settings.demoMode || AppEnvironment.launchDemo) { return .setup }
         switch center.phase {
@@ -17,7 +18,7 @@ struct SyncHero: View {
         case .waitingUnlock: return .locked
         default: break
         }
-        if log.lastSuccess == nil { return .waiting }
+        if center.historyPending || log.lastSuccess == nil { return .waiting }
         return .ok
     }
 
@@ -86,7 +87,9 @@ struct SyncHero: View {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .symbolEffect(.rotate, options: .repeat(.continuous), isActive: center.isSyncing)
-                    if center.isSyncing {
+                    if !settings.syncEnabled {
+                        Text("同期はOFFです")
+                    } else if center.isSyncing {
                         Text("Invio in corso…")
                     } else if mood == .error || mood == .paused {
                         Text("Riprendi ora")
@@ -100,7 +103,7 @@ struct SyncHero: View {
             }
             .buttonStyle(.glassProminent)
             .tint(Palette.brand[1])
-            .disabled(center.isSyncing)
+            .disabled(center.isSyncing || !settings.syncEnabled || (!settings.connectionReady && !AppEnvironment.isDemo))
             .sensoryFeedback(.impact(weight: .light), trigger: center.isSyncing) { _, new in new }
         }
         .padding(20)
@@ -135,7 +138,7 @@ struct SyncHero: View {
 
     private var title: LocalizedStringKey {
         switch mood {
-        case .ok: "Tutto sincronizzato"
+        case .ok: "確認できたデータを送信済み"
         case .syncing: "Sincronizzazione…"
         case .error: "Qualcosa non è andato"
         case .setup: "Manca la destinazione"
@@ -146,6 +149,7 @@ struct SyncHero: View {
     }
 
     private var subtitle: String {
+        if !settings.syncEnabled { return "設定の「同期を有効にする」をONにすると送信を再開します。" }
         switch mood {
         case .syncing:
             return center.progress.samplesSent > 0

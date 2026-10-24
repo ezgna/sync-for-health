@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "645AD620F0EFB688C9523B8D"
-               BuildableName = "SaluteLibera.app"
+               BuildableName = "HealthBridge.app"
                BlueprintName = "SaluteLibera"
                ReferencedContainer = "container:SaluteLibera.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "645AD620F0EFB688C9523B8D"
-            BuildableName = "SaluteLibera.app"
+            BuildableName = "HealthBridge.app"
             BlueprintName = "SaluteLibera"
             ReferencedContainer = "container:SaluteLibera.xcodeproj">
          </BuildableReference>
@@ -56,7 +56,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "645AD620F0EFB688C9523B8D"
-            BuildableName = "SaluteLibera.app"
+            BuildableName = "HealthBridge.app"
             BlueprintName = "SaluteLibera"
             ReferencedContainer = "container:SaluteLibera.xcodeproj">
          </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "645AD620F0EFB688C9523B8D"
-            BuildableName = "SaluteLibera.app"
+            BuildableName = "HealthBridge.app"
             BlueprintName = "SaluteLibera"
             ReferencedContainer = "container:SaluteLibera.xcodeproj">
          </BuildableReference>

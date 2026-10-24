@@ -7,26 +7,57 @@ import HealthKit
 @MainActor
 enum HealthBackground {
     private static var query: HKObserverQuery?
+    private static var transition: Task<Void, Never>?
+    private static var generation = 0
 
-    static func start(groups: Set<DataGroup>) {
-        guard Health.isAvailable else { return }
-        if AppEnvironment.isDemo { return }
-        stop()
-        let entries = HealthCatalog.entries(in: groups)
-        let descriptors = entries.compactMap { entry in
-            entry.sampleType.map { HKQueryDescriptor(sampleType: $0, predicate: nil) }
-        }
-        guard !descriptors.isEmpty else { return }
+    static func start(groups: Set<DataGroup>) { restart(groups: groups) }
 
-        let q = HKObserverQuery(queryDescriptors: descriptors) { _, types, completion, error in
-            let done = CompletionBox(completion)
-            if let error {
-                DiagLog.error("osservatore", "errore: \(DiagLog.describe(error))")
-                done.call()
+    /// Await the preceding disable operation before installing observers. An old
+    /// disable callback can therefore never remove a newly enabled delivery.
+    static func restart(groups: Set<DataGroup>) {
+        reconfigure(groups: groups)
+    }
+
+    static func stop() { reconfigure(groups: nil) }
+
+    private static func reconfigure(groups: Set<DataGroup>?) {
+        generation += 1
+        let requestedGeneration = generation
+        if let query { Health.store.stop(query) }
+        query = nil
+        let previous = transition
+        transition = Task {
+            await previous?.value
+            guard Health.isAvailable else { return }
+            let disabled = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                Health.store.disableAllBackgroundDelivery { success, _ in continuation.resume(returning: success) }
+            }
+            guard disabled else {
+                DiagLog.warning("background", "riallineamento background non riuscito")
                 return
             }
-            let names = (types ?? []).map(\.identifier).sorted()
-            DiagLog.info("osservatore", "nuovi dati segnalati per \(names.count) tipi\(names.isEmpty ? "" : ": " + names.prefix(8).joined(separator: ", "))\(names.count > 8 ? ", …" : "")")
+            guard requestedGeneration == generation, let groups,
+                  AppSettings.shared.syncEnabled, !AppEnvironment.isDemo else { return }
+            await install(groups: groups, includeRoutes: AppSettings.shared.includeRoutes,
+                          requestedGeneration: requestedGeneration)
+        }
+    }
+
+    private static func install(groups: Set<DataGroup>, includeRoutes: Bool, requestedGeneration: Int) async {
+        let entries = HealthCatalog.entries(in: groups)
+        // Correlations have no background delivery. Their quantity members wake
+        // the coordinator, which also scans correlation records.
+        var observed = entries.filter { $0.kind != .correlation }.compactMap { entry in
+            entry.sampleType.map { ($0, entry.immediate) }
+        }
+        if includeRoutes && groups.contains(.allenamenti) {
+            observed.append((HKSeriesType.workoutRoute(), true))
+        }
+        let descriptors = observed.map { HKQueryDescriptor(sampleType: $0.0, predicate: nil) }
+        guard !descriptors.isEmpty else { return }
+        let q = HKObserverQuery(queryDescriptors: descriptors) { _, _, completion, error in
+            let done = CompletionBox(completion)
+            guard error == nil else { done.call(); return }
             Task {
                 await SyncCoordinator.shared.request(.automatico)
                 done.call()
@@ -34,27 +65,15 @@ enum HealthBackground {
         }
         query = q
         Health.store.execute(q)
-        DiagLog.info("osservatore", "avviato su \(descriptors.count) tipi")
-
-        for entry in entries {
-            guard let type = entry.sampleType else { continue }
-            Health.store.enableBackgroundDelivery(for: type, frequency: entry.immediate ? .immediate : .hourly) { _, error in
-                if let error {
-                    DiagLog.warning("background", "consegna in background non attiva per \(type.identifier): \(DiagLog.describe(error))")
+        for (type, immediate) in observed {
+            guard requestedGeneration == generation else { return }
+            let enabled = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                Health.store.enableBackgroundDelivery(for: type, frequency: immediate ? .immediate : .hourly) { success, _ in
+                    continuation.resume(returning: success)
                 }
             }
+            if !enabled { DiagLog.warning("background", "consegna in background non attiva per un tipo") }
         }
-    }
-
-    static func stop() {
-        if let query { Health.store.stop(query) }
-        query = nil
-    }
-
-    /// Riallinea osservatori e consegna in background ai gruppi attivi.
-    static func restart(groups: Set<DataGroup>) {
-        Health.store.disableAllBackgroundDelivery { _, _ in }
-        start(groups: groups)
     }
 }
 
@@ -76,8 +95,8 @@ final class CompletionBox: @unchecked Sendable {
 
 /// BGAppRefreshTask (ogni ora circa) e BGProcessingTask (invii lunghi, es. storico completo).
 enum BackgroundTasks {
-    static let refreshID = "it.vcnngr.syncforhealth.refresh"
-    static let processingID = "it.vcnngr.syncforhealth.processing"
+    static let refreshID = (Bundle.main.bundleIdentifier ?? "app.ezgna.healthbridge") + ".refresh"
+    static let processingID = (Bundle.main.bundleIdentifier ?? "app.ezgna.healthbridge") + ".processing"
 
     /// Da chiamare in application(_:didFinishLaunchingWithOptions:).
     static func register() {
@@ -94,8 +113,8 @@ enum BackgroundTasks {
         scheduleAll()
         let box = TaskBox(task)
         let work = Task {
-            await SyncCoordinator.shared.request(trigger)
-            box.complete(success: !Task.isCancelled)
+            let succeeded = await SyncCoordinator.shared.request(trigger)
+            box.complete(success: succeeded && !Task.isCancelled)
         }
         task.expirationHandler = {
             DiagLog.warning("background", "task scaduto: \(task.identifier)")

@@ -29,6 +29,8 @@ struct SaluteLiberaApp: App {
                 DiagLog.info("app", "in primo piano")
                 Task { await today.refresh() }
                 // Riprende da solo (es. dopo un invio in pausa); se già in pari costa pochissimo.
+                settings.reloadCredentials()
+                if !settings.syncEnabled { break }
                 if center.isSyncing { center.refreshKeepAwake() } else { center.syncNow(.automatico) }
             default:
                 break
@@ -49,7 +51,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             DiagLog.info("app", "dati protetti disponibili (iPhone sbloccato)")
             MainActor.assumeIsolated {
                 // Salute torna leggibile: si riprende da dove ci si era fermati.
-                if AppSettings.shared.onboardingDone { SyncCenter.shared.syncNow(.automatico) }
+                AppSettings.shared.reloadCredentials()
+                if AppSettings.shared.onboardingDone && AppSettings.shared.syncEnabled { SyncCenter.shared.syncNow(.automatico) }
             }
         }
         center.addObserver(forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: .main) { _ in
@@ -61,7 +64,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             let groups = settings.enabledGroups
             Task { await Health.logAuthorizationStatus(groups: groups) }
             // Gli osservatori HealthKit vanno riattivati a ogni avvio (anche in background).
-            if settings.onboardingDone {
+            settings.reloadCredentials()
+            if settings.onboardingDone && settings.syncEnabled {
                 HealthBackground.start(groups: settings.enabledGroups)
             }
         }
@@ -105,7 +109,7 @@ struct RootView: View {
                         try await Health.requestAuthorization(groups: all, includeRoutes: true)
                         print("autorizzazione richiesta per \(HealthCatalog.readTypes(groups: all, includeRoutes: true).count) tipi")
                     } catch {
-                        print("errore autorizzazione: \(error)")
+                        DiagLog.warning("permessi", DiagLog.describe(error))
                     }
                 }
             }
@@ -114,7 +118,7 @@ struct RootView: View {
             withAnimation(.spring(duration: 0.6)) { showOnboarding = !done }
             if done {
                 HealthBackground.start(groups: settings.enabledGroups)
-                if settings.endpointURL != nil { center.syncNow(.manuale) }
+                if settings.syncEnabled && settings.endpointURL != nil { center.syncNow(.manuale) }
             }
         }
     }

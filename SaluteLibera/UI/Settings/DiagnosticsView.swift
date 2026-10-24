@@ -3,6 +3,7 @@ import SwiftUI
 /// Registro tecnico: consultazione, esportazione e spedizione al server.
 /// Contiene solo conteggi, tipi, esiti ed errori — mai valori di salute.
 struct DiagnosticsView: View {
+    @Environment(AppSettings.self) private var settings
     @State private var lines: [String] = []
     @State private var sending = false
     @State private var sendResult: SendResult?
@@ -48,12 +49,12 @@ struct DiagnosticsView: View {
                             }
                         }
                     }
-                    .disabled(sending)
+                    .disabled(sending || !settings.syncEnabled || !settings.diagnosticsEnabled || settings.demoMode)
                     ShareLink(item: DiagLog.fileURL) {
                         Label("Esporta il registro", systemImage: "square.and.arrow.up")
                     }
                 } footer: {
-                    Text("Il registro contiene solo eventi tecnici (tipi di dato, conteggi, esiti, errori), mai valori di salute. Dopo ogni sincronizzazione, al massimo ogni 15 minuti, le righe nuove vengono inviate anche al tuo server.")
+                    Text("測定値を含まない技術ログです。Macへの送信は設定で明示的にONにした場合だけ行います。デモでは送信しません。")
                 }
 
                 Section {

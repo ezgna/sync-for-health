@@ -4,13 +4,13 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>it.vcnngr.syncforhealth.refresh</string>
-		<string>it.vcnngr.syncforhealth.processing</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).processing</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>it</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sync for Health</string>
+	<string>HealthBridge</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,15 +36,10 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Sync for Health legge solo i dati di Salute che autorizzi e li invia esclusivamente al server che hai indicato tu. Nessun altro li riceve: niente pubblicità, niente analisi, niente iCloud.</string>
+	<string>HealthBridge legge solo i dati di Salute che autorizzi e li invia esclusivamente al server che hai indicato tu. Nessun altro li riceve: niente pubblicità, niente analisi, niente iCloud.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Sync for Health non scrive dati in Salute.</string>
+	<string>HealthBridge non scrive dati in Salute.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

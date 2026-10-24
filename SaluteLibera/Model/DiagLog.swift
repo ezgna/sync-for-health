@@ -1,6 +1,5 @@
 import Foundation
 import os
-import UIKit
 
 /// Registro diagnostico: file di testo a rotazione + os.Logger con gli stessi messaggi.
 ///
@@ -33,7 +32,7 @@ enum DiagLog {
     static let maxPending = 300
 
     private static let queue = DispatchQueue(label: "it.vcnngr.syncforhealth.log")
-    private static let logger = Logger(subsystem: "it.vcnngr.syncforhealth", category: "diagnostica")
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "app.ezgna.healthbridge", category: "diagnostica")
 
     nonisolated(unsafe) private static let stamp: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -46,24 +45,54 @@ enum DiagLog {
     static func warning(_ category: String, _ message: String) { write(.warning, category, message) }
     static func error(_ category: String, _ message: String) { write(.error, category, message) }
 
-    /// Descrizione completa di un errore: dominio, codice, descrizione.
+    /// Only allowlisted domain labels and numeric codes: never NSError descriptions,
+    /// userInfo, URLs, response bodies or nested provider text.
     static func describe(_ error: Error) -> String {
+        if let upload = error as? UploadError { return upload.diagnosticCode }
         let ns = error as NSError
-        var s = "\(ns.domain) \(ns.code): \(ns.localizedDescription)"
-        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
-            s += " (causa: \(underlying.domain) \(underlying.code): \(underlying.localizedDescription))"
+        return "\(safeDomain(ns.domain)).\(ns.code)"
+    }
+
+    private static func safeDomain(_ domain: String) -> String {
+        switch domain {
+        case NSURLErrorDomain: "url"
+        case NSCocoaErrorDomain: "cocoa"
+        case NSPOSIXErrorDomain: "posix"
+        case NSOSStatusErrorDomain: "osstatus"
+        case "com.apple.healthkit", "HKErrorDomain": "healthkit"
+        case "BGTaskSchedulerErrorDomain": "background"
+        default: "other"
         }
-        return s
+    }
+
+    /// Old versions could include server error bodies in pending diagnostics.
+    /// Discard those diagnostic files once rather than upload legacy private data.
+    /// Must run on queue before reading/writing the files.
+    private static func preparePrivacyFormat() -> Bool {
+        let key = "diagnosticaPrivacyFormatVersion"
+        guard UserDefaults.standard.integer(forKey: key) < 2 else { return true }
+        let files = FileManager.default
+        do {
+            for url in [fileURL, previousURL, pendingURL] where files.fileExists(atPath: url.path) {
+                try files.removeItem(at: url)
+            }
+            UserDefaults.standard.set(2, forKey: key)
+            return true
+        } catch {
+            // Never read or ship a legacy file if cleanup could not be completed.
+            return false
+        }
     }
 
     static func write(_ level: Level, _ category: String, _ message: String) {
         switch level {
-        case .info: logger.info("[\(category, privacy: .public)] \(message, privacy: .public)")
-        case .warning: logger.warning("[\(category, privacy: .public)] \(message, privacy: .public)")
-        case .error: logger.error("[\(category, privacy: .public)] \(message, privacy: .public)")
+        case .info: logger.info("[\(category, privacy: .public)] \(message, privacy: .private)")
+        case .warning: logger.warning("[\(category, privacy: .public)] \(message, privacy: .private)")
+        case .error: logger.error("[\(category, privacy: .public)] \(message, privacy: .private)")
         }
         let date = Date()
         queue.async {
+            guard preparePrivacyFormat() else { return }
             let line = "\(stamp.string(from: date)) [\(level.rawValue)] [\(category)] \(message)\n"
             append(line, to: fileURL)
             append(line, to: pendingURL)
@@ -76,6 +105,7 @@ enum DiagLog {
     /// Ultime `count` righe (file precedente incluso se serve).
     static func tail(_ count: Int) -> [String] {
         queue.sync {
+            guard preparePrivacyFormat() else { return [] }
             var lines = readLines(fileURL)
             if lines.count < count { lines = readLines(previousURL) + lines }
             return Array(lines.suffix(count))
@@ -83,9 +113,10 @@ enum DiagLog {
     }
 
     /// Righe in attesa di spedizione (al massimo le ultime 300) e la dimensione letta,
-    /// da passare a `markShipped` dopo un 2xx.
+    /// da passare a `markShipped` dopo un ACK protocollo 2 verificato.
     static func pending() -> (lines: [String], bytes: Int) {
         queue.sync {
+            guard preparePrivacyFormat() else { return ([], 0) }
             let data = (try? Data(contentsOf: pendingURL)) ?? Data()
             let text = String(decoding: data, as: UTF8.self)
             let lines = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
@@ -96,6 +127,7 @@ enum DiagLog {
     /// Rimuove dalle righe in attesa i primi `bytes` byte (quelli spediti con successo).
     static func markShipped(bytes: Int) {
         queue.async {
+            guard preparePrivacyFormat() else { return }
             guard let data = try? Data(contentsOf: pendingURL) else { return }
             let rest = data.count > bytes ? data.subdata(in: bytes..<data.count) : Data()
             try? rest.write(to: pendingURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
@@ -165,10 +197,30 @@ actor DiagShipper {
     private static let lastKey = "diagnosticaUltimoInvio"
 
     private var inFlight = false
+    private var uploadTask: Task<Int, Error>?
+    private var runningRevision: UUID?
+    private var cancellationGeneration: UInt = 0
+
+    /// Called on every settings change, alongside cancellation of regular syncs.
+    func cancel() {
+        cancellationGeneration &+= 1
+        uploadTask?.cancel()
+    }
+
+    /// Ignore delayed notifications for older settings and never cancel a task
+    /// which already uses the current revision.
+    func cancelStale(revision: UUID) async {
+        let currentRevision = await MainActor.run { AppSettings.shared.snapshot.revision }
+        guard currentRevision == revision, let runningRevision, runningRevision != revision else { return }
+        cancel()
+    }
 
     struct Body: Encodable, Sendable {
         var app = "salute-libera"
-        var versione = 1
+        var versione = 2
+        var batch_id = UUID().uuidString
+        let installation_id: String
+        let destination_id: String
         let diagnostica: Diagnostics
     }
 
@@ -192,26 +244,48 @@ actor DiagShipper {
     func ship() async -> String? {
         guard !inFlight else { return nil }
         inFlight = true
-        defer { inFlight = false }
+        let generation = cancellationGeneration
+        defer { inFlight = false; uploadTask = nil; runningRevision = nil }
         let settings = await MainActor.run { AppSettings.shared.snapshot }
+        runningRevision = settings.revision
+        guard !AppEnvironment.isDemo, settings.syncEnabled, settings.diagnosticsEnabled else {
+            return String(localized: "Invio diagnostica disattivato nelle Impostazioni.")
+        }
         guard let endpoint = settings.endpoint else {
             return String(localized: "Nessun indirizzo di destinazione configurato.")
         }
         let pending = DiagLog.pending()
         guard !pending.lines.isEmpty else { return nil }
-        let body = Body(diagnostica: Diagnostics(
+        let body = Body(installation_id: settings.installationID, destination_id: settings.destinationID,
+                        diagnostica: Diagnostics(
             versione_app: DiagLog.appVersion, build: DiagLog.appBuild, ios: DiagLog.iosVersion,
             dispositivo: Uploader.deviceModel, righe: pending.lines))
         let uploader = Uploader(endpoint: endpoint, token: settings.token, gzip: settings.gzip, logRequests: false)
         do {
-            try await uploader.send(body, attempts: 1)
+            // Settings changes cancel regular syncs. Diagnostics also recheck the
+            // opt-in and snapshot immediately before creating their HTTP request.
+            guard await MainActor.run(body: {
+                !AppEnvironment.isDemo && AppSettings.shared.isCurrent(settings) && AppSettings.shared.syncEnabled
+                    && AppSettings.shared.diagnosticsEnabled
+            }), generation == cancellationGeneration else {
+                return String(localized: "Impostazioni modificate: invio diagnostica interrotto.")
+            }
+            try Task.checkCancellation()
+            let task = Task { try await uploader.send(body, attempts: 1) }
+            uploadTask = task
+            _ = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            guard generation == cancellationGeneration else { throw UploadError.cancelled }
             DiagLog.markShipped(bytes: pending.bytes)
             UserDefaults.standard.set(Date(), forKey: Self.lastKey)
             DiagLog.info("diagnostica", "spedite \(pending.lines.count) righe al server")
             return nil
         } catch {
             DiagLog.warning("diagnostica", "spedizione non riuscita: \(DiagLog.describe(error))")
-            return error.localizedDescription
+            return (error as? UploadError)?.errorDescription ?? DiagLog.describe(error)
         }
     }
 }

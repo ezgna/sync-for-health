@@ -2,9 +2,8 @@ import Foundation
 
 /// Dati di esempio, interamente sintetici, per la modalità dimostrativa
 /// (interruttore in Impostazioni, oppure `-demo` nelle build DEBUG).
-/// Rendono provabile l'app senza dati in Salute e senza server (revisione App Store,
-/// simulatore, screenshot); con un indirizzo configurato fanno un invio vero, utile per
-/// provare il proprio server o tools/ricevitore_prova.py. Nessun dato reale.
+/// Rendono provabile l'app senza dati in Salute e senza server. La dimostrazione
+/// è esclusivamente locale: non costruisce né trasmette payload sanitari.
 enum DemoData {
     static func today() -> TodaySnapshot {
         let cal = Calendar.current
@@ -127,124 +126,35 @@ enum DemoData {
         return Array(list.sorted { $0.date > $1.date }.prefix(SyncLog.limit))
     }
 
-    /// Invio finto ma reale: costruisce un payload plausibile e lo spedisce all'endpoint.
-    static func runDemoSync(uploader: Uploader?, record: SyncRecord,
-                            progress: SyncJob.Progress) async -> SyncRecord {
+    /// Local-only animation. This API deliberately accepts no uploader/endpoint,
+    /// and returns zero delivered samples/bytes/requests with no sync success.
+    static func runDemoSync(record: SyncRecord, progress: SyncJob.Progress) async -> SyncRecord {
         var record = record
+        record.samples = 0
+        record.deleted = 0
+        record.bytes = 0
+        record.requests = 0
+        record.outcome = .interrotto
+        record.message = String(localized: "Dimostrazione locale: nessun dato inviato.")
         let start = Date()
-        // Avanzamento simulato, come durante il primo invio dello storico.
-        let steps = ["HKQuantityTypeIdentifierStepCount", "HKQuantityTypeIdentifierDistanceWalkingRunning",
-                     "HKQuantityTypeIdentifierActiveEnergyBurned", "HKQuantityTypeIdentifierBasalEnergyBurned",
-                     "HKQuantityTypeIdentifierHeartRate", "HKQuantityTypeIdentifierHeartRate",
-                     "HKQuantityTypeIdentifierHeartRate", "HKQuantityTypeIdentifierRestingHeartRate"]
-        let total = HealthCatalog.availableEntries.count
-        var status = SyncProgress(typeCount: total)
-        for (i, id) in steps.enumerated() {
-            status.typeIndex = [1, 2, 14, 15, 44, 44, 44, 45][i]
-            status.typeIdentifier = id
-            status.samplesSent = 1_265_000 + i * 145_000
-            status.blocksSent = status.samplesSent / 5000
-            await progress(status)
-            DiagLog.info("tipo", "\(id): ancora assente, letti 5000, eliminati 0, pagine 1 (demo)")
-            try? await Task.sleep(for: .milliseconds(1100))
-        }
-        var payload = samplePayload()
-        // Come nella sincronizzazione vera: gli ECG viaggiano in un POST a parte.
-        let ecgPayload = Payload(dispositivo: payload.dispositivo, inviato: payload.inviato, ecg: payload.ecg)
-        payload.ecg = nil
+        let types = ["HKQuantityTypeIdentifierStepCount", "HKQuantityTypeIdentifierHeartRate",
+                     "HKCategoryTypeIdentifierSleepAnalysis", "HKWorkoutTypeIdentifier"]
+        var status = SyncProgress(typeCount: types.count)
         do {
-            try await Task.sleep(for: .milliseconds(900)) // lascia vedere l'animazione
-            var bytes = 0
-            if let uploader {
-                bytes += try await uploader.send(payload)
-                bytes += try await uploader.send(ecgPayload)
-            } else {
-                // Nessun server: invio solo simulato, si contano i byte che sarebbero partiti.
-                bytes = (try? Uploader.encoder.encode(payload).count + Uploader.encoder.encode(ecgPayload).count) ?? 0
+            for (index, type) in types.enumerated() {
+                try Task.checkCancellation()
+                status.typeIndex = index + 1
+                status.typeIdentifier = type
+                await progress(status)
+                try await Task.sleep(for: .milliseconds(150))
             }
-            let quantities: Int = payload.campioni?.count ?? 0
-            let categories: Int = payload.categorie?.count ?? 0
-            let workouts: Int = payload.allenamenti?.count ?? 0
-            let ecgs: Int = ecgPayload.ecg?.count ?? 0
-            let n = quantities + categories + workouts + ecgs
-            record.samples = n
-            record.deleted = payload.eliminati?.count ?? 0
-            record.bytes = bytes
-            record.requests = 2
-            record.outcome = .riuscito
-            status.typeIndex = total
-            status.samplesSent += n
-            await progress(status)
         } catch {
-            record.outcome = .errore
-            record.message = error.localizedDescription
+            record.message = String(localized: "Dimostrazione locale interrotta: nessun dato inviato.")
         }
         record.duration = Date().timeIntervalSince(start)
         return record
     }
 
-    static func samplePayload() -> Payload {
-        let now = Date()
-        let src = "Apple Watch"
-        var quantities: [QuantityRecord] = []
-        for i in 0..<60 {
-            let t = now.addingTimeInterval(TimeInterval(-i * 120))
-            quantities.append(QuantityRecord(
-                uuid: UUID().uuidString, tipo: "HKQuantityTypeIdentifierHeartRate",
-                valore: Double(62 + (i * 7) % 23), unita: "count/min",
-                inizio: ISO.string(t), fine: ISO.string(t), fonte: src,
-                metadati: ["HKMetadataKeyHeartRateMotionContext": "1"]))
-        }
-        for h in 0..<12 {
-            let t0 = now.addingTimeInterval(TimeInterval(-(h + 1) * 3600))
-            quantities.append(QuantityRecord(
-                uuid: UUID().uuidString, tipo: "HKQuantityTypeIdentifierStepCount",
-                valore: Double(300 + (h * 271) % 900), unita: "count",
-                inizio: ISO.string(t0), fine: ISO.string(t0.addingTimeInterval(3600)), fonte: "iPhone"))
-        }
-        quantities.append(QuantityRecord(
-            uuid: UUID().uuidString, tipo: "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
-            valore: 48.2, unita: "ms", inizio: ISO.string(now), fine: ISO.string(now), fonte: src))
-
-        let night = today().sleep!
-        let codes: [SleepStage: (Int, String)] = [
-            .awake: (2, "awake"), .core: (3, "asleepCore"), .deep: (4, "asleepDeep"), .rem: (5, "asleepREM"),
-        ]
-        let categories = night.segments.map { seg in
-            CategoryRecord(uuid: UUID().uuidString, tipo: "HKCategoryTypeIdentifierSleepAnalysis",
-                           valore: codes[seg.stage]!.0, etichetta: codes[seg.stage]!.1,
-                           inizio: ISO.string(seg.start), fine: ISO.string(seg.end), fonte: src)
-        }
-
-        let wStart = now.addingTimeInterval(-3 * 3600)
-        let workout = WorkoutRecord(
-            uuid: UUID().uuidString, attivita: "running",
-            inizio: ISO.string(wStart), fine: ISO.string(wStart.addingTimeInterval(2_710)),
-            durata_s: 2_710, energia_kcal: 412.5, distanza_m: 7_840, fonte: src,
-            statistiche: [
-                "HKQuantityTypeIdentifierHeartRate": WorkoutStat(unita: "count/min", media: 148, minimo: 96, massimo: 171),
-                "HKQuantityTypeIdentifierActiveEnergyBurned": WorkoutStat(unita: "kcal", somma: 412.5),
-                "HKQuantityTypeIdentifierDistanceWalkingRunning": WorkoutStat(unita: "m", somma: 7_840),
-                "HKQuantityTypeIdentifierRunningPower": WorkoutStat(unita: "W", media: 251, minimo: 120, massimo: 342),
-            ],
-            metadati: ["HKIndoorWorkout": "0"])
-
-        let ecg = ECGRecord(uuid: UUID().uuidString, inizio: ISO.string(now.addingTimeInterval(-86_400)),
-                            fine: ISO.string(now.addingTimeInterval(-86_370)),
-                            classificazione: "sinusRhythm", bpm_medio: 64, sintomi: "none", fonte: src,
-                            frequenza_hz: 512, unita_tracciato: "µV", tracciato: syntheticECG())
-
-        return Payload(
-            dispositivo: Uploader.deviceModel,
-            inviato: ISO.string(now),
-            campioni: quantities,
-            categorie: categories,
-            allenamenti: [workout],
-            ecg: [ecg],
-            eliminati: [UUID().uuidString, UUID().uuidString],
-            caratteristiche: Characteristics(data_di_nascita: "1990-01-01", sesso: "other",
-                                             gruppo_sanguigno: "notSet", modalita_movimento: "activeEnergy"))
-    }
 }
 
 /// Accende e spegne la modalità dimostrativa senza riavviare l'app.

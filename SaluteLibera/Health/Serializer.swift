@@ -6,6 +6,25 @@ import HealthKit
 enum Serializer {
     static func source(_ s: HKSample) -> String { s.sourceRevision.source.name }
 
+    static func provenance(_ s: HKSample) -> SampleProvenance {
+        let revision = s.sourceRevision
+        let os = revision.operatingSystemVersion
+        var device: DeviceProvenance?
+        if let d = s.device {
+            device = DeviceProvenance(
+                name: d.name, manufacturer: d.manufacturer, model: d.model,
+                hardware_version: d.hardwareVersion, firmware_version: d.firmwareVersion,
+                software_version: d.softwareVersion, local_identifier: d.localIdentifier,
+                udi_device_identifier: d.udiDeviceIdentifier)
+        }
+        return SampleProvenance(
+            bundle_id: revision.source.bundleIdentifier,
+            source_version: revision.version,
+            source_product_type: revision.productType,
+            source_os_version: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
+            device: device)
+    }
+
     /// Metadati come mappa di stringhe (date in ISO 8601, quantità come testo).
     static func metadata(_ m: [String: Any]?) -> [String: String]? {
         guard let m, !m.isEmpty else { return nil }
@@ -31,7 +50,33 @@ enum Serializer {
             inizio: ISO.string(s.startDate),
             fine: ISO.string(s.endDate),
             fonte: source(s),
-            metadati: metadata(s.metadata))
+            metadati: metadata(s.metadata),
+            provenienza: provenance(s),
+            numero_quantita: s.count)
+    }
+
+    /// Il valore del campione può essere solo un riepilogo di molte misure.
+    /// Per l'esportazione leggiamo anche i valori originali della serie.
+    static func quantity(_ s: HKQuantitySample, unit: HKUnit, store: HKHealthStore) async throws -> QuantityRecord {
+        try Task.checkCancellation()
+        var record = quantity(s, unit: unit)
+        guard s.count > 1 else { return record }
+        let predicate = HKSamplePredicate.quantitySample(
+            type: s.quantityType, predicate: HKQuery.predicateForObject(with: s.uuid))
+        let descriptor = HKQuantitySeriesSampleQueryDescriptor(
+            predicate: predicate, options: .orderByQuantitySampleStartDate)
+        var points: [QuantitySeriesPoint] = []
+        for try await entry in descriptor.results(for: store) {
+            try Task.checkCancellation()
+            points.append(QuantitySeriesPoint(
+                valore: entry.quantity.doubleValue(for: unit),
+                inizio: ISO.string(entry.dateInterval.start),
+                fine: ISO.string(entry.dateInterval.end)))
+        }
+        try Task.checkCancellation()
+        guard points.count == s.count else { throw SerializationError.incompleteQuantitySeries }
+        record.serie = points
+        return record
     }
 
     static func category(_ s: HKCategorySample) -> CategoryRecord {
@@ -43,7 +88,17 @@ enum Serializer {
             inizio: ISO.string(s.startDate),
             fine: ISO.string(s.endDate),
             fonte: source(s),
-            metadati: metadata(s.metadata))
+            metadati: metadata(s.metadata),
+            provenienza: provenance(s))
+    }
+
+    static func correlation(_ s: HKCorrelation) -> CorrelationRecord {
+        CorrelationRecord(
+            uuid: s.uuid.uuidString, tipo: s.correlationType.identifier,
+            inizio: ISO.string(s.startDate), fine: ISO.string(s.endDate), fonte: source(s),
+            membri: s.objects.map { CorrelationMember(uuid: $0.uuid.uuidString, tipo: $0.sampleType.identifier) }
+                .sorted { $0.uuid < $1.uuid },
+            metadati: metadata(s.metadata), provenienza: provenance(s))
     }
 
     /// ECG con riepilogo e tracciato completo (derivazione simile a DI, in µV).
@@ -51,24 +106,37 @@ enum Serializer {
     static func electrocardiogram(_ e: HKElectrocardiogram, store: HKHealthStore) async throws -> ECGRecord {
         var record = electrocardiogramSummary(e)
         record.frequenza_hz = e.samplingFrequency?.doubleValue(for: .hertz())
-        let waveform = try await voltages(of: e, store: store)
-        if !waveform.isEmpty {
+        let waveform = try await waveform(of: e, store: store)
+        if !waveform.values.isEmpty {
             record.unita_tracciato = "µV"
-            record.tracciato = waveform
+            record.tracciato = waveform.values
+            record.tempi_tracciato_s = waveform.offsets
         }
         return record
     }
 
-    /// Valori in microvolt della derivazione appleWatchSimilarToLeadI, arrotondati a 1 decimale.
+    /// Riepilogo per il grafico locale; l'esportazione usa waveform per mantenere anche i tempi.
     static func voltages(of e: HKElectrocardiogram, store: HKHealthStore) async throws -> [Double] {
+        try await waveform(of: e, store: store).values
+    }
+
+    /// Valori e offset temporali HealthKit, senza arrotondamenti o tempi ricostruiti.
+    static func waveform(of e: HKElectrocardiogram, store: HKHealthStore) async throws -> (values: [Double], offsets: [Double]) {
+        try Task.checkCancellation()
         let microvolt = HKUnit.voltUnit(with: .micro)
         var values: [Double] = []
+        var offsets: [Double] = []
         values.reserveCapacity(max(e.numberOfVoltageMeasurements, 0))
+        offsets.reserveCapacity(max(e.numberOfVoltageMeasurements, 0))
         for try await measurement in HKElectrocardiogramQueryDescriptor(e).results(for: store) {
+            try Task.checkCancellation()
             guard let q = measurement.quantity(for: .appleWatchSimilarToLeadI) else { continue }
-            values.append((q.doubleValue(for: microvolt) * 10).rounded() / 10)
+            values.append(q.doubleValue(for: microvolt))
+            offsets.append(measurement.timeSinceSampleStart)
         }
-        return values
+        try Task.checkCancellation()
+        guard values.count == e.numberOfVoltageMeasurements else { throw SerializationError.incompleteECG }
+        return (values, offsets)
     }
 
     static func classificationName(_ c: HKElectrocardiogram.Classification) -> String {
@@ -100,7 +168,10 @@ enum Serializer {
             classificazione: classification,
             bpm_medio: e.averageHeartRate?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
             sintomi: symptoms,
-            fonte: source(e))
+            fonte: source(e),
+            metadati: metadata(e.metadata),
+            provenienza: provenance(e),
+            numero_misure: e.numberOfVoltageMeasurements)
     }
 
     static func audiogram(_ a: HKAudiogramSample) -> AudiogramRecord {
@@ -108,7 +179,14 @@ enum Serializer {
         let dbhl = HKUnit.decibelHearingLevel()
         let points = a.sensitivityPoints.map { p in
             var point = AudiogramPoint(frequenza_hz: p.frequency.doubleValue(for: hz))
-            for test in p.tests where test.type == .air {
+            point.test = p.tests.map { test in
+                AudiogramTest(
+                    tipo_raw: test.type.rawValue, lato_raw: test.side.rawValue,
+                    masked: test.masked, sensibilita_dbhl: test.sensitivity.doubleValue(for: dbhl),
+                    limite_inferiore_dbhl: test.clampingRange?.lowerBound?.doubleValue(for: dbhl),
+                    limite_superiore_dbhl: test.clampingRange?.upperBound?.doubleValue(for: dbhl))
+            }
+            for test in p.tests where test.type == .air && !test.masked {
                 let v = test.sensitivity.doubleValue(for: dbhl)
                 switch test.side {
                 case .left: point.sinistro_dbhl = v
@@ -119,7 +197,8 @@ enum Serializer {
             return point
         }
         return AudiogramRecord(uuid: a.uuid.uuidString, inizio: ISO.string(a.startDate),
-                               fine: ISO.string(a.endDate), fonte: source(a), punti: points)
+                               fine: ISO.string(a.endDate), fonte: source(a), punti: points,
+                               metadati: metadata(a.metadata), provenienza: provenance(a))
     }
 
     static func stateOfMind(_ s: HKStateOfMind) -> StateOfMindRecord {
@@ -131,14 +210,22 @@ enum Serializer {
             classificazione: StateOfMindNames.valence[s.valenceClassification.rawValue] ?? "unknown",
             etichette: s.labels.map { StateOfMindNames.labels[$0.rawValue] ?? "label_\($0.rawValue)" },
             associazioni: s.associations.map { StateOfMindNames.associations[$0.rawValue] ?? "association_\($0.rawValue)" },
-            fonte: source(s))
+            fonte: source(s),
+            fine: ISO.string(s.endDate),
+            tipo_raw: s.kind.rawValue,
+            classificazione_raw: s.valenceClassification.rawValue,
+            etichette_raw: s.labels.map(\.rawValue),
+            associazioni_raw: s.associations.map(\.rawValue),
+            metadati: metadata(s.metadata),
+            provenienza: provenance(s))
     }
 
     /// Allenamento con statistiche; il percorso GPS solo se richiesto nelle impostazioni.
-    static func workout(_ w: HKWorkout, store: HKHealthStore, includeRoute: Bool) async -> WorkoutRecord {
+    static func workout(_ w: HKWorkout, store: HKHealthStore, includeRoute: Bool) async throws -> WorkoutRecord {
+        try Task.checkCancellation()
         var stats: [String: WorkoutStat] = [:]
         var energy: Double?
-        var distance: Double?
+        var distances: [Double] = []
         for (type, s) in w.allStatistics {
             let unit = HealthCatalog.entry(for: type.identifier)?.unit ?? .count()
             guard type.is(compatibleWith: unit) else { continue }
@@ -150,8 +237,9 @@ enum Serializer {
             stats[type.identifier] = stat
             if type.identifier == HKQuantityTypeIdentifier.activeEnergyBurned.rawValue {
                 energy = stat.somma
-            } else if type.identifier.hasPrefix("HKQuantityTypeIdentifierDistance"), distance == nil {
-                distance = stat.somma
+            } else if type.identifier.hasPrefix("HKQuantityTypeIdentifierDistance"),
+                      type.is(compatibleWith: .meter()), let sum = s.sumQuantity() {
+                distances.append(sum.doubleValue(for: .meter()))
             }
         }
         var record = WorkoutRecord(
@@ -161,40 +249,45 @@ enum Serializer {
             fine: ISO.string(w.endDate),
             durata_s: w.duration,
             energia_kcal: energy,
-            distanza_m: distance,
+            // Un multisport può avere più distanze. Non sceglierne una in ordine casuale.
+            distanza_m: distances.count == 1 ? distances[0] : nil,
             fonte: source(w),
             statistiche: stats.isEmpty ? nil : stats,
-            metadati: metadata(w.metadata))
+            metadati: metadata(w.metadata),
+            provenienza: provenance(w))
         if includeRoute {
-            let points = await route(for: w, store: store)
-            record.percorso = points.isEmpty ? nil : points
+            // [] significa che il percorso è stato letto ed è vuoto: permette di
+            // eliminare nel ricevitore un percorso rimosso, invece di conservarlo.
+            record.percorso = try await route(for: w, store: store)
         }
+        try Task.checkCancellation()
         return record
     }
 
     /// Legge i punti GPS di un allenamento (HKWorkoutRoute).
-    static func route(for workout: HKWorkout, store: HKHealthStore) async -> [RoutePoint] {
+    static func route(for workout: HKWorkout, store: HKHealthStore) async throws -> [RoutePoint] {
+        try Task.checkCancellation()
         let descriptor = HKSampleQueryDescriptor(
             predicates: [.workoutRoute(HKQuery.predicateForObjects(from: workout))],
-            sortDescriptors: [])
-        guard let routes = try? await descriptor.result(for: store) else { return [] }
+            sortDescriptors: [SortDescriptor(\.startDate)])
+        let routes = try await descriptor.result(for: store)
         var points: [RoutePoint] = []
         for route in routes {
-            let locations = await withCheckedContinuation { (cont: CheckedContinuation<[RoutePoint], Never>) in
-                let acc = RouteAccumulator()
-                let q = HKWorkoutRouteQuery(route: route) { _, locs, done, error in
-                    if let locs {
-                        acc.append(locs.map {
-                            RoutePoint(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude,
-                                       alt: $0.altitude, t: ISO.string($0.timestamp))
-                        })
-                    }
-                    if done || error != nil { cont.resume(returning: acc.points) }
-                }
-                store.execute(q)
+            try Task.checkCancellation()
+            for try await location in HKWorkoutRouteQueryDescriptor(route).results(for: store) {
+                try Task.checkCancellation()
+                points.append(RoutePoint(
+                    lat: location.coordinate.latitude, lon: location.coordinate.longitude,
+                    alt: location.altitude, t: ISO.string(location.timestamp),
+                    precisione_orizzontale_m: location.horizontalAccuracy,
+                    precisione_verticale_m: location.verticalAccuracy,
+                    velocita_m_s: location.speed,
+                    precisione_velocita_m_s: location.speedAccuracy,
+                    direzione_gradi: location.course,
+                    precisione_direzione_gradi: location.courseAccuracy))
             }
-            points += locations
         }
+        try Task.checkCancellation()
         return points
     }
 
@@ -371,18 +464,15 @@ enum Serializer {
     ]
 }
 
-/// Accumula i punti GPS che HKWorkoutRouteQuery consegna a blocchi (sempre in serie).
-final class RouteAccumulator: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [RoutePoint] = []
+enum SerializationError: Error, LocalizedError {
+    case incompleteQuantitySeries
+    case incompleteECG
 
-    func append(_ points: [RoutePoint]) {
-        lock.lock(); storage += points; lock.unlock()
-    }
-
-    var points: [RoutePoint] {
-        lock.lock(); defer { lock.unlock() }
-        return storage
+    var errorDescription: String? {
+        switch self {
+        case .incompleteQuantitySeries: "HealthKit non ha restituito tutta la serie quantitativa. Riprova la sincronizzazione."
+        case .incompleteECG: "HealthKit non ha restituito tutto il tracciato ECG. Riprova la sincronizzazione."
+        }
     }
 }
 

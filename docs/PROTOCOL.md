@@ -1,268 +1,184 @@
-# Protocollo di invio — Salute Libera v1
+# HealthBridge 送信 protocol v2
 
-Salute Libera invia i dati di Salute con richieste **HTTP POST** all'indirizzo configurato
-dall'utente. Questo documento descrive tutto ciò che un server deve sapere per riceverli.
+このフォークの現行仕様です。上流の「任意の 2xx で成功」とは互換性がありません。旧仕様は [UPSTREAM_PROTOCOL_V1.md](UPSTREAM_PROTOCOL_V1.md) に記録として残しています。JSON の既存キーは上流のイタリア語を維持します。
 
-## Richiesta
+## HTTP と認証
 
-| Elemento | Valore |
+| 項目 | 値 |
 |---|---|
-| Metodo | `POST` all'URL configurato, **usato così com'è** (eventuali parametri come `?t=SEGRETO` restano nella query) |
-| `Content-Type` | `application/json; charset=utf-8` |
-| `Authorization` | `Bearer <token>` — solo se l'utente ha inserito un token |
-| `Content-Encoding` | `gzip` — solo se l'utente ha attivato la compressione (spenta di serie) |
-| `User-Agent` | `SaluteLibera/<versione>` |
-| Schema | `https://` ovunque; `http://` accettato solo verso indirizzi locali (localhost, `*.local`, 10/8, 172.16/12, 192.168/16) |
+| メソッド | 設定した最終 URL への `POST` |
+| URL | `https://` のみ。ユーザー名・パスワード・query・fragment は不可 |
+| Content-Type | `application/json; charset=utf-8` |
+| Authorization | 必須の `Bearer <token>`。Token は URL と分離 |
+| Content-Encoding | gzip 設定時は `gzip`、通常は非圧縮 |
+| Cache-Control | `no-store` |
+| リダイレクト | 同一ホストを含め、すべて拒否 |
 
-## Risposta attesa
+Cookie・キャッシュ・共有認証情報を使わない ephemeral URLSession を使用します。標準の TLS 証明書検証を使用し、検証を無効にする独自実装はありません。Token の前後空白は正規化し、内部改行・空 Token は拒否します。
 
-- **2xx** (qualsiasi corpo): il blocco è considerato consegnato e l'app salva i segnalibri
-  (ancore) dei tipi contenuti. Il blocco non verrà più reinviato.
-- **408, 429, 5xx o errore di rete**: l'app ritenta fino a 4 volte con attesa crescente
-  (2 s, 6 s, 18 s), poi rinuncia e riprova al giro successivo.
-- **Altri 4xx**: nessun nuovo tentativo immediato; l'errore viene mostrato nel registro.
+## 保存確認 ACK
 
-Finché il server non risponde 2xx **nessun dato viene considerato inviato**: al giro successivo
-si riparte dallo stesso punto. Ne segue che il server può ricevere **duplicati** (per esempio se
-ha salvato i dati ma la risposta si è persa): deduplica sempre per `uuid`.
-
-## Prova di connessione
-
-Il pulsante «Prova connessione» invia esattamente:
+成功応答は **HTTP 200、Content-Type: application/json** で、次の全条件が一致する必要があります。ACK は 8 KiB 以下です。
 
 ```json
-{"app":"salute-libera","versione":1,"prova":true}
-```
-
-Rispondi 2xx per confermare. Non contiene dati.
-
-## Diagnostica
-
-Oltre ai dati, l'app invia allo **stesso indirizzo** (stesso token, stessa impostazione gzip)
-un POST separato con le ultime righe del suo registro tecnico:
-
-```json
-{"app": "salute-libera", "versione": 1,
- "diagnostica": {
-   "versione_app": "0.1.0", "build": "1", "ios": "26.3.1", "dispositivo": "iPhone17,1",
-   "righe": [
-     "2026-10-01T16:54:31.279+02:00 [INFO] [sync] inizio (manuale), gruppi: altro,attivita,corpo,cuore,mindfulness,respirazione,sonno,udito, gzip: no",
-     "2026-10-01T16:54:41.319+02:00 [INFO] [rete] POST esempio.it 25158 byte → HTTP 200 in 58 ms, tentativo 1/4",
-     "2026-10-01T16:54:41.359+02:00 [INFO] [sync] fine (manuale): riuscito, 93 campioni, 2 eliminati, 2 POST, 105890 byte, 10.1 s"
-   ]}}
-```
-
-- Riconoscibile dalla chiave `diagnostica` (non contiene sezioni di dati).
-- `righe`: al massimo **300**, solo quelle non ancora consegnate, in ordine cronologico.
-  Formato: `<ISO 8601 con millisecondi> [INFO|WARN|ERRORE] [categoria] messaggio`.
-  Categorie: `app`, `sync`, `tipo`, `rete`, `permessi`, `osservatore`, `background`, `diagnostica`.
-- **Mai valori di salute**: solo tipi, conteggi, byte, esiti, durate ed errori
-  (dominio, codice, descrizione).
-- Inviato dopo ogni sincronizzazione (riuscita o no) ma **al massimo ogni 15 minuti**, e a mano
-  da Impostazioni › Diagnostica. Un singolo tentativo, mai bloccante per i dati: se fallisce,
-  le righe restano in coda per il giro successivo.
-- Rispondi 2xx per confermare: le righe consegnate non verranno rispedite.
-
-## Documento
-
-```jsonc
 {
-  "app": "salute-libera",
-  "versione": 1,
-  "dispositivo": "iPhone17,1",                     // identificativo modello
-  "inviato": "2026-10-01T09:41:00+02:00",          // ISO 8601 con fuso locale
-  "campioni":       [ ... ],   // campioni quantitativi
-  "categorie":      [ ... ],   // campioni di categoria (sonno, eventi, sintomi…)
-  "allenamenti":    [ ... ],
-  "ecg":            [ ... ],   // riepilogo + tracciato completo (µV); sempre in POST a parte
-  "audiogrammi":    [ ... ],
-  "stati_d_animo":  [ ... ],
-  "eliminati":      ["uuid", ...],              // campioni cancellati in Salute
-  "caratteristiche": { ... }                    // inviate una volta sola
+  "ok": true,
+  "protocol_version": 2,
+  "batch_id": "11111111-1111-4111-8111-111111111111",
+  "body_sha256": "<非圧縮の受信JSON本文そのもののSHA-256、lowercase hex 64文字>",
+  "committed": true,
+  "kind": "health"
 }
 ```
 
-**Sono presenti solo le sezioni che contengono dati.** Ogni POST contiene al massimo
-**5000 elementi** (record + uuid eliminati, sommati su tutte le sezioni); il primo invio
-(storico completo) arriva quindi in molti POST successivi.
+- `batch_id` は送信本文と同じ UUID。
+- hash は parse 後に再整形した JSON ではなく、**gzip 解凍後の元バイト列**で計算します。
+- `kind` は通常データ・checkpoint が `health`、接続テストが `probe`、診断が `diagnostic`。
+- `committed: true` は受信側で検証と永続保存を終えた後だけ返します。メモリ上の queue へ置いた時点で返しません。
+- 200 HTML、201/202/204、hash・batch ID・kind の不一致、過大 ACK は成功にしません。
+- 非成功時に元本文や測定値、認証情報を応答へ写しません。送信アプリもサーバーのエラー本文をログに入れません。
 
-**Gli ECG viaggiano in POST dedicati**, con al massimo **5 ECG per POST** (ognuno porta circa
-15 000 valori, ~80 KB di JSON). Un POST con `ecg` contiene solo `ecg` ed eventualmente
-`eliminati` (uuid di ECG cancellati); non contiene mai `campioni`, `categorie` o altre sezioni. Tutte le date sono stringhe ISO 8601
-con il fuso orario del telefono, precisione al secondo.
+通信エラー・408・429・5xx は最大 4 回、2 秒・6 秒・18 秒の待機で再試行します。その他の拒否・不正 ACK は即時再試行せず、同期は未完了になります。同じ `send` の再試行では JSON バイト列と batch ID を変えません。後の同期でページを再構築すると batch ID は新しくなるため、受信側は sample UUID の冪等性も実装します。
 
-### `campioni`
+## 共通 envelope
 
 ```json
 {
-  "uuid": "6F0D1E7A-…",
-  "tipo": "HKQuantityTypeIdentifierStepCount",
-  "valore": 123.0,
-  "unita": "count",
-  "inizio": "2026-10-01T08:00:00+02:00",
-  "fine": "2026-10-01T09:00:00+02:00",
-  "fonte": "iPhone di Mario",
-  "metadati": {"HKWasUserEntered": "1"}          // facoltativo, sempre stringhe
+  "app": "salute-libera",
+  "versione": 2,
+  "batch_id": "11111111-1111-4111-8111-111111111111",
+  "installation_id": "22222222-2222-4222-8222-222222222222",
+  "destination_id": "33333333-3333-4333-8333-333333333333",
+  "dispositivo": "iPhone-model",
+  "inviato": "2026-10-24T00:00:00.123456789Z",
+  "campioni": [],
+  "categorie": [],
+  "allenamenti": [],
+  "ecg": [],
+  "audiogrammi": [],
+  "stati_d_animo": [],
+  "correlazioni": [],
+  "eliminati": [],
+  "caratteristiche": {}
 }
 ```
 
-`tipo` è l'identificatore HealthKit originale. `unita` è sempre quella della tabella più sotto,
-fissa per tipo (non dipende dalle preferenze dell'utente).
+空の配列セクションは通常省略します。`caratteristiche: {}` は属性スナップショットを空へ更新する意味を持ちます。`app` は既存識別子を維持しており、画面の製品名は HealthBridge です。
 
-### `categorie`
+`installation_id` と `destination_id` は UUID です。宛先に結び付いたカーソルを別宛先へ流用しません。`dispositivo` はモデル名であり、端末固有 ID として使いません。
+
+日時は UTC の ISO 8601 文字列で、Date の小数秒を 9 桁で表します。受信側の検索インデックスに日時精度の制約があっても、元文字列と raw レコードを保持します。測定時の元タイムゾーンがメタデータにあれば維持し、送信時の端末タイムゾーンで置き換えません。
+
+## サイズとカーソル
+
+通常 POST はサンプルと削除 UUID の合計最大 500 件、非圧縮 JSON 最大 8 MiB。GPS 付きワークアウトは 1 件ずつ、ECG は最大 5 件をまとめます。バイト上限が先に効く場合はそこで区切ります。単独サンプルが 8 MiB を超える場合は明示的に失敗し、黙って捨てません。
+
+HealthKit から読んだ 1 ページを分割した場合は、全 POST の ACK を確認してからそのページの anchor を保存します。途中失敗やディスク保存失敗の後は同じページを再送できます。受信側は UUID upsert と削除 tombstone により、二重登録や古い再送による復活を防ぎます。
+
+## レコード
+
+すべての sample レコードは `uuid` を持ちます。通常の測定には `inizio`（開始）、`fine`（終了）、`fonte`（ソース表示名）があり、次を追加できます。
 
 ```json
 {
-  "uuid": "…", "tipo": "HKCategoryTypeIdentifierSleepAnalysis",
-  "valore": 3, "etichetta": "asleepCore",
-  "inizio": "…", "fine": "…", "fonte": "Apple Watch di Mario", "metadati": {…}
+  "metadati": {"HKTimeZone": "Asia/Tokyo"},
+  "provenienza": {
+    "bundle_id": "example.synthetic.health",
+    "source_version": "1.0",
+    "source_product_type": "synthetic-model",
+    "source_os_version": "26.0.0",
+    "device": {
+      "name": "synthetic-device",
+      "manufacturer": "example",
+      "model": "synthetic-model",
+      "hardware_version": "1",
+      "firmware_version": "1",
+      "software_version": "1",
+      "local_identifier": "synthetic-local-id",
+      "udi_device_identifier": "synthetic-udi"
+    }
+  }
 }
 ```
 
-`valore` è il valore grezzo HealthKit; `etichetta` è il nome leggibile quando noto:
+値がない optional 項目は省略します。`metadati` は文字列マップで、任意の HealthKit オブジェクトを型ごと完全復元するアーカイブではありません。機器の識別情報も測定値と同じく私的データとして扱い、診断へ入れません。
 
-| Tipo | Valori |
+| セクション | 固有項目 |
 |---|---|
-| SleepAnalysis | 0 inBed, 1 asleepUnspecified, 2 awake, 3 asleepCore, 4 asleepDeep, 5 asleepREM |
-| AppleStandHour | 0 stood, 1 idle |
-| MenstrualFlow, Bleeding… | 1 unspecified, 2 light, 3 medium, 4 heavy, 5 none |
-| Sintomi (Headache, Fatigue, …) | 0 unspecified, 1 notPresent, 2 mild, 3 moderate, 4 severe |
-| MoodChanges, SleepChanges | 0 present, 1 notPresent |
-| AppetiteChanges | 0 unspecified, 1 noChange, 2 decreased, 3 increased |
-| CervicalMucusQuality | 1 dry, 2 sticky, 3 creamy, 4 watery, 5 eggWhite |
-| OvulationTestResult | 1 negative, 2 luteinizingHormoneSurge, 3 indeterminate, 4 estrogenSurge |
-| Pregnancy/ProgesteroneTestResult | 1 negative, 2 positive, 3 indeterminate |
-| Contraceptive | 1 unspecified, 2 implant, 3 injection, 4 intrauterineDevice, 5 intravaginalRing, 6 oral, 7 patch |
-| AppleWalkingSteadinessEvent | 1 initialLow, 2 initialVeryLow, 3 repeatLow, 4 repeatVeryLow |
-| Eventi (MindfulSession, HighHeartRateEvent, …) | 0 notApplicable |
+| `campioni` | `tipo`（HK identifier）、`valore`（Double）、`unita`、`numero_quantita`、series の場合 `serie` |
+| `categorie` | `tipo`、`valore`（整数 raw enum）、既知なら `etichetta` |
+| `allenamenti` | `attivita`、`durata_s`、任意の `energia_kcal`・`distanza_m`・`statistiche`・`percorso` |
+| `ecg` | `classificazione`、`bpm_medio`、`sintomi`、`numero_misure`、`frequenza_hz`、`unita_tracciato`、`tracciato`、`tempi_tracciato_s` |
+| `audiogrammi` | `punti`（frequency と左右 summary、元の各 test） |
+| `stati_d_animo` | `tipo`・`valenza`・`classificazione`・`etichette`・`associazioni`と対応する raw enum 値 |
+| `correlazioni` | `tipo`、`membri: [{uuid,tipo}]` |
 
-### `allenamenti`
+### 数量と series
+
+数量の単位は [HealthCatalog.swift](../SaluteLibera/Health/HealthCatalog.swift) の型ごとの固定単位です。`unita: "%"` は割合値であり、`0.18` が 18%、`0.97` が 97% です。生値と表示値を分離します。
+
+HealthKit の `HKQuantitySample.count > 1` の場合は、summary の `valore` だけではなく次の `serie` を送ります。各点の単位は親の `unita` と同じです。全点を取得できなければ失敗にし、その sample を完了扱いしません。summary と各点を二重集計しないでください。
 
 ```json
 {
-  "uuid": "…", "attivita": "running",
-  "inizio": "…", "fine": "…", "durata_s": 2710.0,
-  "energia_kcal": 412.5, "distanza_m": 7840.0,
-  "fonte": "Apple Watch di Mario",
-  "statistiche": {
-    "HKQuantityTypeIdentifierHeartRate": {"unita": "count/min", "media": 148, "minimo": 96, "massimo": 171},
-    "HKQuantityTypeIdentifierActiveEnergyBurned": {"unita": "kcal", "somma": 412.5}
-  },
-  "metadati": {"HKIndoorWorkout": "0"},
-  "percorso": [{"lat": 45.46, "lon": 9.19, "alt": 122.0, "t": "…"}]   // solo se attivato
+  "numero_quantita": 2,
+  "serie": [
+    {"valore": 70.123456, "inizio": "2026-10-24T00:00:00.000100000Z", "fine": "2026-10-24T00:00:00.000100000Z"},
+    {"valore": 71.654321, "inizio": "2026-10-24T00:00:00.000200000Z", "fine": "2026-10-24T00:00:00.000200000Z"}
+  ]
 }
 ```
 
-`attivita` è il nome inglese in snake_case di `HKWorkoutActivityType` (`running`, `cycling`,
-`traditional_strength_training`, `yoga`, …; valori sconosciuti: `activity_<n>`).
-`percorso` è presente solo se l'utente ha attivato «Percorsi GPS degli allenamenti» (spento di serie).
+### 血圧 correlation
 
-### `ecg`
+現在の correlation catalog は `HKCorrelationTypeIdentifierBloodPressure` です。`membri` は HealthKit の `HKCorrelation.objects` から取得した本来の UUID 関係であり、時刻による推測ではありません。上下値自体は `campioni` の該当 UUID を参照します。
 
-```json
-{"uuid": "2473D549-…", "inizio": "2026-09-30T16:23:42+02:00", "fine": "2026-09-30T16:24:12+02:00",
- "classificazione": "sinusRhythm", "bpm_medio": 64.0, "sintomi": "none",
- "fonte": "Apple Watch di Mario",
- "frequenza_hz": 512.0, "unita_tracciato": "µV",
- "tracciato": [3.6, 6.6, 4.9, 2.4, 2.3, 3.7, 2.8, -2.1, …]}
-```
+correlation 型自体の読取権限を要求せず、内包する systolic / diastolic の権限を要求します。HealthKit は未許可 member を隠す場合があるため、常に両方あると仮定しません。[Apple の説明](https://developer.apple.com/documentation/healthkit/hkcorrelationquery)
 
-| Campo | Significato |
-|---|---|
-| `classificazione` | notSet, sinusRhythm, atrialFibrillation, inconclusiveLowHeartRate, inconclusiveHighHeartRate, inconclusivePoorReading, inconclusiveOther, unrecognized |
-| `bpm_medio` | frequenza media calcolata da Apple (count/min) |
-| `sintomi` | notSet, none, present |
-| `frequenza_hz` | frequenza di campionamento (`samplingFrequency`), di solito 512 |
-| `unita_tracciato` | sempre `"µV"` (microvolt) |
-| `tracciato` | tutte le misure della derivazione `appleWatchSimilarToLeadI` (simile a DI), in ordine, arrotondate a 1 decimale. Il tempo del campione *i* è `inizio + i / frequenza_hz`. Una registrazione di 30 s a 512 Hz ≈ 15 360 valori |
+### ワークアウトと GPS
 
-`frequenza_hz`, `unita_tracciato` e `tracciato` mancano solo se Salute non fornisce misure
-per quell'ECG.
+`statistiche` は HK identifier → `{unita,somma?,media?,minimo?,massimo?}`。距離が複数種類あるワークアウトでは `distanza_m` を省略し、種類別統計を保持します。辞書の任意の先頭値を総距離として返しません。
 
-**Reinvio una tantum (formato ECG v2).** Le versioni precedenti inviavano gli ECG senza
-tracciato. Al primo avvio della versione con tracciato l'app azzera **solo** il segnalibro
-degli ECG (valore salvato `versione_ecg` < 2 → 2) e reinvia **tutti** gli ECG una volta,
-completi. Il server riceverà quindi di nuovo uuid già noti: deve aggiornarli (upsert per
-`uuid`), non rifiutarli.
+GPS 点は `{lat,lon,alt,t}` に加え、利用可能なら `precisione_orizzontale_m`、`precisione_verticale_m`、`velocita_m_s`、`precisione_velocita_m_s`、`direzione_gradi`、`precisione_direzione_gradi` を保持します。Core Location の未有効値を示す負の値も生値のまま保持するため、表示・分析側は妥当性を確認します。
 
-### `audiogrammi`
+- `percorso` 省略: その POST でルートを取得していない。受信側の既存ルートを消さない。
+- `percorso: []`: ルート取得成功・空。受信側の古いルートを空へ更新する。
+- ルート取得エラー: 失敗を返し、そのワークアウトの処理を完了にしない。
 
-```json
-{"uuid": "…", "inizio": "…", "fine": "…", "fonte": "…",
- "punti": [{"frequenza_hz": 1000, "sinistro_dbhl": 10, "destro_dbhl": 15}]}
-```
+ルート独立 anchor の変更検出後にワークアウトを再照合するため、同じワークアウト UUID の更新を受信側で許可します。
 
-### `stati_d_animo`
+### ECG・聴力・心の状態
 
-```json
-{"uuid": "…", "inizio": "…", "tipo": "dailyMood", "valenza": 0.4,
- "classificazione": "slightlyPleasant", "etichette": ["calm", "grateful"],
- "associazioni": ["family"], "fonte": "…"}
-```
+ECG の `tracciato` は `appleWatchSimilarToLeadI` の µV 値を丸めず保存します。`tempi_tracciato_s` は同じ index の測定の sample 開始からの実 offset 秒です。`i / frequenza_hz` だけで時刻を再構築せず、offset があればそちらを使います。
 
-### `eliminati`
+Audiogram の各 point は `frequenza_hz`、任意の `sinistro_dbhl`・`destro_dbhl` に加え、`test` 配列を持ちます。各 test は `tipo_raw`、`lato_raw`、`masked`、`sensibilita_dbhl`、任意の `limite_inferiore_dbhl`・`limite_superiore_dbhl` を保持します。左右 summary は unmasked air test に限定し、元 test 配列を正本にします。
 
-Array di uuid di campioni cancellati in Salute dopo essere stati inviati (di qualsiasi sezione).
-Il server dovrebbe eliminarli o marcarli come cancellati.
+心の状態はラベルに加えて `tipo_raw`、`classificazione_raw`、`etichette_raw`、`associazioni_raw` と metadata を保持します。未知の enum を既知の値へ決めつけません。
 
-### `caratteristiche`
+### 削除と属性
 
-Inviate una sola volta (e di nuovo dopo «Invia di nuovo tutto lo storico»), se il gruppo
-«Corpo» è attivo e almeno un valore è disponibile:
+`eliminati` は sample UUID の配列です。受信側では測定値を削除または非表示にし、UUID の tombstone を残します。古い再送が来ても復活させません。過去のバックアップからの消去は別の保管運用です。
+
+`caratteristiche` は Body グループの現在の属性スナップショットで、同期ごとに再取得します。`data_di_nascita`、`sesso`、`gruppo_sanguigno`、`fototipo`、`sedia_a_rotelle`、`modalita_movimento` が任意で入ります。空 `{}` も明示的な更新です。読取不可を、医学的にその属性が存在しない証明と解釈しません。
+
+## 接続テスト・診断・checkpoint
+
+接続テストは共通 envelope の `app/versione/batch_id/installation_id/destination_id` に `prova: true` を加えたものです。健康データのセクションは含みません。ACK の `kind` は `probe` です。
+
+診断は任意で初期 OFF。同じ共通 envelope に `diagnostica` オブジェクトを加えます。最新ログは最大 300 行で、送信先は同じ URL と Token。ACK の `kind` は `diagnostic` です。サーバー本文、NSError の任意の説明、測定値、Token はログへ転記しません。診断受信を健康データの最新受信と混同しません。
+
+最後に通常 envelope へ次の `checkpoint` を加えた health POST を送ります。
 
 ```json
-{"data_di_nascita": "1984-03-12", "sesso": "male", "gruppo_sanguigno": "0+",
- "fototipo": "III", "sedia_a_rotelle": false, "modalita_movimento": "activeEnergy"}
+{
+  "checkpoint": {
+    "status": "scan_complete",
+    "scan_id": "44444444-4444-4444-8444-444444444444",
+    "completed_at": "2026-10-24T00:05:00.123456789Z",
+    "groups": ["corpo", "cuore"],
+    "routes": false
+  }
+}
 ```
 
-`sesso`: female, male, other. `gruppo_sanguigno`: A+, A-, B+, B-, AB+, AB-, 0+, 0-.
-
-## Unità per tipo (`campioni.unita`)
-
-Le unità sono le canoniche di HealthKit (stringa `HKUnit.unitString`), con due scelte più
-pratiche: frequenze in **count/min** invece di count/s.
-
-> **Attenzione alle percentuali:** con l'unità `%` HealthKit esprime le frazioni:
-> `OxygenSaturation` 97 % arriva come `0.97`, `BodyFatPercentage` 18 % come `0.18`.
-
-| Unità | Tipi (prefisso `HKQuantityTypeIdentifier` omesso) |
-|---|---|
-| `%` | WalkingDoubleSupportPercentage, WalkingAsymmetryPercentage, AppleWalkingSteadiness, AtrialFibrillationBurden, PeripheralPerfusionIndex, OxygenSaturation, BodyFatPercentage, BloodAlcoholContent |
-| `IU` | InsulinDelivery |
-| `L` | ForcedVitalCapacity, ForcedExpiratoryVolume1 |
-| `L/min` | PeakExpiratoryFlowRate |
-| `S` | ElectrodermalActivity |
-| `W` | RunningPower, CyclingPower, CyclingFunctionalThresholdPower |
-| `appleEffortScore` | WorkoutEffortScore, EstimatedWorkoutEffortScore |
-| `cm` | RunningVerticalOscillation |
-| `count` | StepCount, PushCount, SwimmingStrokeCount, FlightsClimbed, AppleSleepingBreathingDisturbances, InhalerUsage, BodyMassIndex, NumberOfAlcoholicBeverages, NumberOfTimesFallen, UVExposure |
-| `count/min` | CyclingCadence, HeartRate, RestingHeartRate, WalkingHeartRateAverage, HeartRateRecoveryOneMinute, RespiratoryRate |
-| `dBASPL` | EnvironmentalAudioExposure, HeadphoneAudioExposure, EnvironmentalSoundReduction |
-| `degC` | AppleSleepingWristTemperature, BodyTemperature, BasalBodyTemperature, WaterTemperature |
-| `g` | DietaryCarbohydrates, DietaryProtein, DietaryFatTotal, DietaryFatSaturated, DietaryFatMonounsaturated, DietaryFatPolyunsaturated, DietaryCholesterol, DietaryFiber, DietarySugar, DietarySodium, DietaryCaffeine, DietaryCalcium, DietaryChloride, DietaryChromium, DietaryCopper, DietaryFolate, DietaryIodine, DietaryIron, DietaryMagnesium, DietaryManganese, DietaryMolybdenum, DietaryNiacin, DietaryPantothenicAcid, DietaryPhosphorus, DietaryPotassium, DietaryRiboflavin, DietarySelenium, DietaryThiamin, DietaryBiotin, DietaryVitaminA, DietaryVitaminB6, DietaryVitaminB12, DietaryVitaminC, DietaryVitaminD, DietaryVitaminE, DietaryVitaminK, DietaryZinc |
-| `kcal` | ActiveEnergyBurned, BasalEnergyBurned, DietaryEnergyConsumed |
-| `kcal/hr·kg` | PhysicalEffort |
-| `kg` | BodyMass, LeanBodyMass |
-| `m` | DistanceWalkingRunning, DistanceCycling, DistanceWheelchair, DistanceSwimming, DistanceDownhillSnowSports, DistanceCrossCountrySkiing, DistancePaddleSports, DistanceRowing, DistanceSkatingSports, RunningStrideLength, WalkingStepLength, SixMinuteWalkTestDistance, UnderwaterDepth, Height, WaistCircumference |
-| `m/s` | RunningSpeed, CyclingSpeed, CrossCountrySkiingSpeed, PaddleSportsSpeed, RowingSpeed, WalkingSpeed, StairAscentSpeed, StairDescentSpeed |
-| `mL` | DietaryWater |
-| `mL/min·kg` | VO2Max |
-| `mg/dL` | BloodGlucose |
-| `min` | AppleExerciseTime, AppleMoveTime, AppleStandTime, TimeInDaylight |
-| `mmHg` | BloodPressureSystolic, BloodPressureDiastolic |
-| `ms` | RunningGroundContactTime, HeartRateVariabilitySDNN |
-
-Note: `count` per BodyMassIndex e UVExposure è adimensionale; `S` è siemens;
-`appleEffortScore` è la scala 1–10 di Apple; i nutrienti (Dietary…) sono tutti in grammi
-eccetto energia (kcal) e acqua (mL).
-
-## Comportamento dell'app
-
-- **Incrementale**: per ogni tipo l'app tiene un'ancora (`HKQueryAnchor`) e chiede a Salute solo
-  le novità da quel punto, incluse le cancellazioni.
-- **Ripresa**: il primo invio (tutto lo storico) è spezzato in blocchi; se si interrompe riparte
-  dall'ultimo blocco confermato.
-- **Quando**: alla comparsa di nuovi dati (consegna in background di HealthKit: immediata per
-  sonno, allenamenti, ECG ed eventi cardiaci, oraria per il resto), periodicamente con
-  BGAppRefreshTask/BGProcessingTask, con «Sincronizza ora» o trascinando la schermata Oggi.
-- **Blocco schermo**: con l'iPhone bloccato Salute non è leggibile; l'invio viene ritentato dopo.
+これは選択した範囲でスキャン処理が終わったことを示します。全 HealthKit 項目の許可、すべてのデータの存在、Apple 純正の集計との一致、現在までの即時同期を保証しません。読取可否をアプリから完全に知ることはできず、空の結果を不存在の証拠にしません。

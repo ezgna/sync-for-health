@@ -23,59 +23,75 @@ enum Storage {
     }
 }
 
-/// Ancore HKAnchoredObjectQuery per tipo, archiviate con NSKeyedArchiver.
-/// Un'ancora viene salvata solo DOPO che il server ha risposto 2xx.
+/// Destination-scoped HealthKit cursors. A disk failure must never advance the
+/// in-memory cursor: replaying an acknowledged page is safe; skipping one is not.
 final class AnchorStore: @unchecked Sendable {
     static let shared = AnchorStore()
 
-    private let url = Storage.directory.appendingPathComponent("ancore.plist")
+    static let routeAnchorID = "__workout_routes__"
+    static let routePendingID = "__workout_routes_pending__"
+    private let url: URL
     private let lock = NSLock()
     private var cache: [String: Data]
+    private var loadFailure: Error?
 
-    private init() {
-        if let data = try? Data(contentsOf: url),
-           let dict = try? PropertyListDecoder().decode([String: Data].self, from: data) {
-            cache = dict
-        } else {
-            cache = [:]
+    init(url: URL = Storage.directory.appendingPathComponent("ancore-v2.plist")) {
+        self.url = url
+        cache = [:]
+        // Legacy unscoped anchors are intentionally not imported. v2 replays all
+        // history once, so a different receiver cannot inherit another's cursor.
+        if FileManager.default.fileExists(atPath: url.path) {
+            do { cache = try PropertyListDecoder().decode([String: Data].self, from: Data(contentsOf: url)) }
+            catch { loadFailure = error }
         }
     }
 
-    func anchor(for identifier: String) -> HKQueryAnchor? {
+    private func key(_ identifier: String, destination: String) -> String { destination + ":" + identifier }
+
+    func data(for identifier: String, destination: String) throws -> Data? {
         lock.lock(); defer { lock.unlock() }
-        guard let data = cache[identifier] else { return nil }
-        return try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data)
+        if let loadFailure { throw loadFailure }
+        return cache[key(identifier, destination: destination)]
     }
 
-    static func archive(_ anchor: HKQueryAnchor) -> Data? {
-        try? NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
+    func anchor(for identifier: String, destination: String) throws -> HKQueryAnchor? {
+        guard let data = try data(for: identifier, destination: destination) else { return nil }
+        guard let anchor = try NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data) else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+        return anchor
     }
 
-    /// Salva in blocco le ancore di un invio riuscito.
-    func commit(_ anchors: [String: Data]) {
-        guard !anchors.isEmpty else { return }
-        lock.lock()
-        cache.merge(anchors) { _, new in new }
-        let snapshot = cache
-        lock.unlock()
-        persist(snapshot)
+    static func archive(_ anchor: HKQueryAnchor) throws -> Data {
+        try NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
     }
 
-    /// Dimentica l'ancora di un solo tipo (che verrà reinviato dall'inizio).
-    func remove(_ identifier: String) {
-        lock.lock()
-        let existed = cache.removeValue(forKey: identifier) != nil
-        let snapshot = cache
-        lock.unlock()
-        if existed { persist(snapshot) }
+    func commit(_ anchors: [String: Data], destination: String, removing: [String] = []) throws {
+        guard !anchors.isEmpty || !removing.isEmpty else { return }
+        lock.lock(); defer { lock.unlock() }
+        if let loadFailure { throw loadFailure }
+        var next = cache
+        for (identifier, value) in anchors { next[key(identifier, destination: destination)] = value }
+        for identifier in removing { next.removeValue(forKey: key(identifier, destination: destination)) }
+        try persist(next)
+        cache = next
     }
 
-    /// Dimentica tutte le ancore: il prossimo invio ripartirà dall'intero storico.
-    func reset() {
-        lock.lock()
-        cache = [:]
-        lock.unlock()
-        persist([:])
+    func remove(_ identifier: String, destination: String) throws {
+        try commit([:], destination: destination, removing: [identifier])
+    }
+
+    func resetRoutes(destination: String) throws {
+        try commit([:], destination: destination, removing: [Self.routeAnchorID, Self.routePendingID])
+    }
+
+    /// Explicit reset also recovers a corrupt cursor file by writing an empty one.
+    func reset(destination: String? = nil) throws {
+        lock.lock(); defer { lock.unlock() }
+        let next = destination.map { id in cache.filter { !$0.key.hasPrefix(id + ":") } } ?? [:]
+        try persist(next)
+        cache = next
+        loadFailure = nil
     }
 
     var isEmpty: Bool {
@@ -83,13 +99,9 @@ final class AnchorStore: @unchecked Sendable {
         return cache.isEmpty
     }
 
-    private func persist(_ dict: [String: Data]) {
-        do {
-            let data = try PropertyListEncoder().encode(dict)
-            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        } catch {
-            DiagLog.error("sync", "impossibile salvare le ancore: \(DiagLog.describe(error))")
-        }
+    private func persist(_ dict: [String: Data]) throws {
+        let data = try PropertyListEncoder().encode(dict)
+        try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }
 

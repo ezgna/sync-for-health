@@ -105,6 +105,14 @@ final class SyncCenter {
 
     func progressed(_ p: SyncProgress) { progress = p }
 
+    /// Demo animation must not alter the real last-check time or success state.
+    func finishedDemo() {
+        phase = .idle
+        trigger = nil
+        progress = SyncProgress()
+        setKeepAwake(false)
+    }
+
     /// Un invio a mano o lo storico completo, in primo piano: lo schermo non si spegne.
     func refreshKeepAwake() {
         let big = trigger == .manuale || trigger == .storico || historyPending
@@ -150,53 +158,74 @@ final class SyncCenter {
 /// un invio provocano un nuovo giro subito dopo.
 actor SyncCoordinator {
     static let shared = SyncCoordinator()
-
-    private var running: Task<Void, Never>?
+    private var running: Task<Bool, Never>?
+    private var activeSettings: SettingsSnapshot?
     private var rerun = false
     private var pendingTrigger: SyncRecord.Trigger = .automatico
 
-    func request(_ trigger: SyncRecord.Trigger) async {
+    /// Returns actual scan success, rather than just task non-cancellation.
+    @discardableResult
+    func request(_ trigger: SyncRecord.Trigger) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        let desired = await MainActor.run { AppSettings.shared.snapshot }
         if let running {
+            if running.isCancelled || activeSettings.map({ $0.revision != desired.revision }) == true {
+                running.cancel()
+                _ = await running.value
+                guard !Task.isCancelled else { return false }
+                return await request(trigger)
+            }
             rerun = true
             if trigger == .manuale || trigger == .storico { pendingTrigger = trigger }
-            await running.value
-            return
+            return await running.value
         }
         let task = Task { await self.loop(first: trigger) }
         running = task
-        await task.value
+        return await task.value
     }
 
-    /// Interrompe l'invio in corso (scadenza di un task in background).
     func cancel() {
-        if running != nil { DiagLog.warning("sync", "invio in corso annullato") }
+        rerun = false
         running?.cancel()
     }
 
-    private func loop(first: SyncRecord.Trigger) async {
+    /// A delayed settings callback must never cancel a job which already uses
+    /// newer settings. Check the actual active snapshot, then verify it is still
+    /// the same scan after the MainActor hop. Once a revision is stale it is
+    /// never reused, even if the user later restores the same visible settings.
+    func cancelStale(revision _: UUID) async {
+        guard let task = running, let snapshot = activeSettings else { return }
+        let stale = await MainActor.run { !AppSettings.shared.isCurrent(snapshot) }
+        guard stale, activeSettings?.revision == snapshot.revision else { return }
+        rerun = false
+        task.cancel()
+        _ = await task.value
+    }
+
+    private func loop(first: SyncRecord.Trigger) async -> Bool {
         var trigger = first
+        var succeeded = false
         repeat {
             rerun = false
-            await runOnce(trigger)
+            succeeded = await runOnce(trigger)
             trigger = pendingTrigger
             pendingTrigger = .automatico
         } while rerun && !Task.isCancelled
+        activeSettings = nil
         running = nil
+        return succeeded && !Task.isCancelled
     }
 
-    private func runOnce(_ trigger: SyncRecord.Trigger) async {
+    private func runOnce(_ trigger: SyncRecord.Trigger) async -> Bool {
         let settings = await MainActor.run { AppSettings.shared.snapshot }
-        // Le sincronizzazioni automatiche tacciono finché non c'è un indirizzo.
+        activeSettings = settings
+        guard settings.syncEnabled, !Task.isCancelled else { return false }
         if settings.endpoint == nil, trigger != .manuale, trigger != .storico, !AppEnvironment.isDemo {
-            DiagLog.info("sync", "\(trigger.rawValue): nessun indirizzo configurato, salto")
-            return
+            return false
         }
         let quietTrigger = trigger == .automatico || trigger == .background
-        // Con l'iPhone bloccato Salute non è leggibile: non è un errore, si aspetta lo sblocco.
         let unlocked = await MainActor.run { UIApplication.shared.isProtectedDataAvailable }
-        let skipLockCheck = AppEnvironment.isDemo
-        if !unlocked, !skipLockCheck {
-            DiagLog.info("sync", "\(trigger.rawValue): dati protetti non disponibili (iPhone bloccato), in attesa dello sblocco")
+        if !unlocked, !AppEnvironment.isDemo {
             let record = SyncRecord(date: Date(), samples: 0, deleted: 0, outcome: .inAttesa, trigger: trigger,
                                     message: String(localized: "In attesa dello sblocco dell'iPhone"),
                                     duration: 0, bytes: 0, requests: 0)
@@ -204,241 +233,310 @@ actor SyncCoordinator {
                 if !quietTrigger { SyncLog.shared.add(record) }
                 SyncCenter.shared.finished(record)
             }
-            return
+            return false
         }
-
-        DiagLog.info("sync", "inizio (\(trigger.rawValue)), gruppi: \(settings.groups.map(\.rawValue).sorted().joined(separator: ",")), gzip: \(settings.gzip ? "sì" : "no")")
         await MainActor.run { SyncCenter.shared.began(trigger) }
+        let demoRun = AppEnvironment.isDemo
         let job = SyncJob(settings: settings, trigger: trigger)
         let record = await job.run { p in
             await MainActor.run { SyncCenter.shared.progressed(p) }
         }
-        let line = "fine (\(trigger.rawValue)): \(record.outcome.rawValue), \(record.samples) campioni, \(record.deleted) eliminati, \(record.requests) POST, \(record.bytes) byte, \(String(format: "%.1f", record.duration)) s"
-        if record.outcome == .errore {
-            DiagLog.error("sync", line + " — \(record.message ?? "")")
-        } else {
-            DiagLog.info("sync", line + (record.message.map { " — \($0)" } ?? ""))
+        if demoRun {
+            await MainActor.run { SyncCenter.shared.finishedDemo() }
+            return false
         }
-        if record.outcome == .riuscito || record.outcome == .nienteDaInviare {
-            UserDefaults.standard.set(true, forKey: AppSettings.Keys.historyComplete)
+        DiagLog.info("sync", "fine: \(record.outcome.rawValue), \(record.samples) campioni, \(record.deleted) eliminati, \(record.requests) POST")
+        let succeeded = record.outcome == .riuscito || record.outcome == .nienteDaInviare
+        let current = await MainActor.run {
+            guard AppSettings.shared.isCurrent(settings) else { return false }
+            // Keep the revision check and completion flag on the same actor as
+            // namespace changes, so an old scan cannot complete a new scope.
+            if succeeded { UserDefaults.standard.set(true, forKey: AppSettings.Keys.historyComplete) }
+            return true
         }
         await MainActor.run {
-            // In automatico non si registrano "niente da inviare" e "in attesa", per non affollare il registro.
-            let quiet = quietTrigger && (record.outcome == .nienteDaInviare
-                                         || (record.outcome == .inAttesa && record.samples == 0))
-            if !quiet { SyncLog.shared.add(record) }
+            if !(quietTrigger && record.outcome == .nienteDaInviare) { SyncLog.shared.add(record) }
             SyncCenter.shared.finished(record)
         }
-        if record.outcome == .riuscito || record.outcome == .nienteDaInviare {
+        if succeeded && current {
             BackgroundTasks.scheduleAll()
+            if settings.diagnosticsEnabled {
+                Task.detached(priority: .utility) { await DiagShipper.shared.shipIfDue() }
+            }
         }
-        // Diagnostica al server: mai bloccante per i dati, al massimo ogni 15 minuti.
-        Task.detached(priority: .utility) { await DiagShipper.shared.shipIfDue() }
+        return succeeded && current
     }
 }
 
-/// Un giro di sincronizzazione: query ancorate per tipo, invii a blocchi,
-/// ancore salvate solo dopo una risposta 2xx.
+/// A scan acknowledges each bounded HTTP chunk, then persists its HealthKit page
+/// cursor. Failure between chunks safely replays that page by sample UUID.
 struct SyncJob: Sendable {
     let settings: SettingsSnapshot
     let trigger: SyncRecord.Trigger
-
-    /// Massimo numero di elementi (campioni + eliminati) per POST.
-    static let maxPerPost = 5000
-
+    static let maxPerPost = 500
+    static let maxECGPerPost = 5
+    static let maxPayloadBytes = 8 * 1024 * 1024
     typealias Progress = @Sendable (SyncProgress) async -> Void
+
+    enum Failure: LocalizedError {
+        case oversizedRecord
+        case invalidRecord
+        var errorDescription: String? {
+            switch self {
+            case .oversizedRecord: "Un singolo campione supera il limite di 8 MiB. Nessun campione è stato saltato."
+            case .invalidRecord: "Il campione non corrisponde al tipo HealthKit richiesto."
+            }
+        }
+    }
+
+    struct RouteReconciliation: Codable {
+        var targetAnchor: Data
+        var workoutAnchor: Data?
+    }
+
+    func ensureCurrent() async throws {
+        try Task.checkCancellation()
+        guard await MainActor.run(body: { AppSettings.shared.isCurrent(settings) }) else {
+            throw CancellationError()
+        }
+    }
 
     func run(progress: @escaping Progress) async -> SyncRecord {
         let start = Date()
         var record = SyncRecord(date: start, samples: 0, deleted: 0, outcome: .nienteDaInviare,
                                 trigger: trigger, message: nil, duration: 0, bytes: 0, requests: 0)
-        // Modalità dimostrativa: dati sintetici. Se c'è un indirizzo vengono spediti davvero
-        // (per provare il server), altrimenti l'invio è solo simulato. Salute non viene letta.
+        guard settings.syncEnabled else { record.outcome = .interrotto; return record }
         if AppEnvironment.isDemo {
-            let uploader = settings.endpoint.map { Uploader(endpoint: $0, token: settings.token, gzip: settings.gzip) }
-            return await DemoData.runDemoSync(uploader: uploader, record: record, progress: progress)
+            return await DemoData.runDemoSync(record: record, progress: progress)
         }
         guard let endpoint = settings.endpoint else {
             record.outcome = .errore
             record.message = String(localized: "Configura l'indirizzo di destinazione nelle Impostazioni.")
             return record
         }
-        let uploader = Uploader(endpoint: endpoint, token: settings.token, gzip: settings.gzip)
-
         guard Health.isAvailable else {
             record.outcome = .errore
             record.message = String(localized: "Salute non è disponibile su questo dispositivo.")
             return record
         }
-
-        Self.migrateIfNeeded()
-        var batch = Batch()
-        let defaults = UserDefaults.standard
-        if settings.groups.contains(.corpo), !defaults.bool(forKey: AppSettings.Keys.characteristicsSent) {
-            let c = Serializer.characteristics(store: Health.store)
-            if !c.isEmpty { batch.characteristics = c }
-        }
-
+        let uploader = Uploader(endpoint: endpoint, token: settings.token, gzip: settings.gzip)
+        let scanID = UUID().uuidString
         let entries = HealthCatalog.entries(in: settings.groups)
         var status = SyncProgress(typeCount: entries.count)
-        var quietTypes = 0
         do {
+            try await ensureCurrent()
+            // Characteristics can change, and permissions can change. An empty
+            // object explicitly clears the receiver's previous snapshot.
+            if settings.groups.contains(.corpo) {
+                var batch = Batch()
+                batch.characteristics = Serializer.characteristics(store: Health.store)
+                try await send(&batch, uploader: uploader, record: &record)
+            }
+            if settings.includeRoutes && settings.groups.contains(.allenamenti) {
+                try await reconcileRoutes(uploader: uploader, record: &record, status: &status, progress: progress)
+            }
             for (index, entry) in entries.enumerated() {
-                try Task.checkCancellation()
+                try await ensureCurrent()
                 guard let type = entry.sampleType else { continue }
                 status.typeIndex = index + 1
                 status.typeIdentifier = entry.id
                 await progress(status)
-                let hadAnchor = AnchorStore.shared.anchor(for: entry.id) != nil
-                var read = 0, removed = 0, pages = 0
-                if entry.kind == .electrocardiogram {
-                    // Gli ECG col tracciato sono grandi: POST dedicati, al massimo 5 per volta.
-                    (read, removed, pages) = try await syncElectrocardiograms(
-                        entry, type: type, uploader: uploader, record: &record, status: &status, progress: progress)
-                } else {
-                    var anchor = AnchorStore.shared.anchor(for: entry.id)
-                    let pageLimit = Self.pageLimit(entry, routes: settings.includeRoutes)
-                    while true {
-                        let room = Self.maxPerPost - batch.count
-                        let limit = max(min(pageLimit, room), min(pageLimit, 100))
-                        let query = HKAnchoredObjectQueryDescriptor(
-                            predicates: [.sample(type: type)], anchor: anchor, limit: limit)
-                        let result = try await query.result(for: Health.store)
-                        pages += 1
-                        read += result.addedSamples.count
-                        removed += result.deletedObjects.count
-                        try await batch.add(result.addedSamples, entry: entry, includeRoutes: settings.includeRoutes)
-                        batch.deleted += result.deletedObjects.map(\.uuid.uuidString)
-                        if let data = AnchorStore.archive(result.newAnchor) { batch.anchors[entry.id] = data }
-                        anchor = result.newAnchor
-                        if batch.count >= Self.maxPerPost {
-                            try await flush(&batch, uploader: uploader, record: &record)
-                            status.samplesSent = record.samples + record.deleted
-                            status.blocksSent = record.requests
-                            await progress(status)
-                        }
-                        if result.addedSamples.count + result.deletedObjects.count < limit { break }
-                    }
-                }
-                if read + removed > 0 || !hadAnchor {
-                    DiagLog.info("tipo", "\(entry.id): ancora \(hadAnchor ? "presente" : "assente"), letti \(read), eliminati \(removed), pagine \(pages)")
-                } else {
-                    quietTypes += 1
+                var anchor = try AnchorStore.shared.anchor(for: entry.id, destination: settings.destinationID)
+                let limit = Self.pageLimit(entry, routes: settings.includeRoutes)
+                while true {
+                    try await ensureCurrent()
+                    let query = HKAnchoredObjectQueryDescriptor(predicates: [.sample(type: type)], anchor: anchor, limit: limit)
+                    let result = try await query.result(for: Health.store)
+                    let archived = try AnchorStore.archive(result.newAnchor)
+                    try await sendPage(result.addedSamples, deleted: result.deletedObjects.map(\.uuid.uuidString),
+                                       entry: entry, uploader: uploader, record: &record)
+                    try await ensureCurrent()
+                    try AnchorStore.shared.commit([entry.id: archived], destination: settings.destinationID)
+                    anchor = result.newAnchor
+                    status.samplesSent = record.samples + record.deleted
+                    status.blocksSent = record.requests
+                    await progress(status)
+                    // Includes deletion-only pages and commits the final empty
+                    // page, including when a preceding page exactly hit limit.
+                    if result.addedSamples.count + result.deletedObjects.count < limit { break }
                 }
             }
-            try await flush(&batch, uploader: uploader, record: &record)
-            status.samplesSent = record.samples + record.deleted
-            status.blocksSent = record.requests
-            await progress(status)
-            DiagLog.info("tipo", "\(quietTypes) tipi senza novità")
-            record.outcome = record.samples + record.deleted > 0 || record.requests > 0 ? .riuscito : .nienteDaInviare
+            try await ensureCurrent()
+            var checkpoint = Batch().makePayload(settings: settings)
+            checkpoint.checkpoint = SyncCheckpoint(scan_id: scanID, completed_at: ISO.string(Date()),
+                                                  groups: settings.groups.map(\.rawValue).sorted(), routes: settings.includeRoutes)
+            let bytes = try await uploader.send(checkpoint)
+            record.bytes += bytes
+            record.requests += 1
+            try await ensureCurrent()
+            record.outcome = .riuscito
         } catch {
-            DiagLog.error("sync", "interrotto al tipo \(status.typeIndex)/\(status.typeCount) \(status.typeIdentifier ?? "?"): \(DiagLog.describe(error))")
             classify(error, into: &record)
         }
         record.duration = Date().timeIntervalSince(start)
         return record
     }
 
-    /// Decide l'esito di un invio che si è fermato per un errore.
-    /// Se alcuni blocchi sono già arrivati al server, l'invio è «parziale» (non un errore).
     private func classify(_ error: Error, into record: inout SyncRecord) {
-        let delivered = record.samples + record.deleted > 0
+        let delivered = record.requests > 0
         if let hk = error as? HKError, hk.code == .errorDatabaseInaccessible {
             record.outcome = delivered ? .parziale : .inAttesa
-            record.message = delivered
-                ? String(localized: "In pausa: iPhone bloccato, riprende da solo")
-                : String(localized: "In attesa dello sblocco dell'iPhone")
-            return
-        }
-        let cancelled: Bool = {
-            if error is CancellationError { return true }
-            if let up = error as? UploadError, case .cancelled = up { return true }
-            return false
-        }()
-        if cancelled {
+            record.message = String(localized: "In attesa dello sblocco dell'iPhone")
+        } else if isCancellation(error) {
             record.outcome = delivered ? .parziale : .interrotto
             record.message = String(localized: "Invio interrotto: riprenderà dal punto in cui si è fermato.")
-            return
+        } else {
+            record.outcome = delivered ? .parziale : .errore
+            // Never copy arbitrary server/HealthKit error bodies into public logs.
+            record.message = (error as? Failure)?.localizedDescription ?? DiagLog.describe(error)
         }
-        let message = (error as? UploadError)?.localizedDescription ?? error.localizedDescription
-        record.outcome = delivered ? .parziale : .errore
-        record.message = delivered
-            ? String(localized: "In pausa: \(message) Riprenderà da qui.")
-            : message
     }
 
-    /// Massimo numero di ECG (con tracciato, ~100 KB l'uno) per POST.
-    static let maxECGPerPost = 5
-
-    /// Versione del formato ECG: 2 = con tracciato. Se quella salvata è minore, l'ancora
-    /// degli ECG viene azzerata una sola volta, così tutti gli ECG ripartono col tracciato.
-    static let ecgFormatVersion = 2
-    static let ecgFormatKey = "versione_ecg"
-
-    static func migrateIfNeeded() {
-        let defaults = UserDefaults.standard
-        guard defaults.integer(forKey: ecgFormatKey) < ecgFormatVersion else { return }
-        AnchorStore.shared.remove("HKDataTypeIdentifierElectrocardiogram")
-        defaults.set(ecgFormatVersion, forKey: ecgFormatKey)
-        DiagLog.info("sync", "migrazione ECG v\(ecgFormatVersion): segnalibro ECG azzerato, tutti gli ECG verranno reinviati col tracciato")
+    private func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let upload = error as? UploadError, case .cancelled = upload { return true }
+        return false
     }
 
-    /// ECG in POST separati: ogni pagina (≤ 5 ECG) viene letta per intero, inviata, e solo
-    /// dopo il 2xx se ne salva l'ancora. Un tracciato alla volta in memoria durante la lettura.
-    private func syncElectrocardiograms(_ entry: CatalogEntry, type: HKSampleType, uploader: Uploader,
-                                        record: inout SyncRecord, status: inout SyncProgress,
-                                        progress: @escaping Progress) async throws -> (Int, Int, Int) {
-        var anchor = AnchorStore.shared.anchor(for: entry.id)
-        var read = 0, removed = 0, pages = 0
-        while true {
-            try Task.checkCancellation()
-            let query = HKAnchoredObjectQueryDescriptor(
-                predicates: [.sample(type: type)], anchor: anchor, limit: Self.maxECGPerPost)
-            let result = try await query.result(for: Health.store)
-            var page = Batch()
-            try await page.add(result.addedSamples, entry: entry, includeRoutes: false)
-            page.deleted = result.deletedObjects.map(\.uuid.uuidString)
-            if let data = AnchorStore.archive(result.newAnchor) { page.anchors[entry.id] = data }
-            anchor = result.newAnchor
-            pages += 1
-            read += result.addedSamples.count
-            removed += result.deletedObjects.count
-            try await flush(&page, uploader: uploader, record: &record)
-            status.samplesSent = record.samples + record.deleted
-            status.blocksSent = record.requests
-            await progress(status)
-            if result.addedSamples.count + result.deletedObjects.count < Self.maxECGPerPost { break }
+    /// Build one serialized record at a time. In particular, full GPS/quantity
+    /// series cannot accumulate across a whole 500-record HealthKit page.
+    private func sendPage(_ samples: [HKSample], deleted: [String], entry: CatalogEntry,
+                          uploader: Uploader, record: inout SyncRecord) async throws {
+        var batch = Batch()
+        var encodedUpperBound = 0
+        for sample in samples {
+            try await ensureCurrent()
+            var one = Batch()
+            try await one.add([sample], entry: entry, includeRoutes: settings.includeRoutes)
+            guard one.recordCount == 1 else { throw Failure.invalidRecord }
+            // Summing single-record envelopes deliberately overestimates bytes,
+            // and avoids re-encoding all earlier records for every new sample.
+            let oneSize = try Self.encodedSize(one.makePayload(settings: settings))
+            if batch.count + one.count > Self.maxPerPost || encodedUpperBound + oneSize > Self.maxPayloadBytes {
+                try await send(&batch, uploader: uploader, record: &record)
+                batch = one
+                encodedUpperBound = oneSize
+            } else {
+                batch = batch.merging(one)
+                encodedUpperBound += oneSize
+            }
+            if entry.kind == .workout && settings.includeRoutes || batch.count >= Self.maxPerPost ||
+                (entry.kind == .electrocardiogram && batch.count >= Self.maxECGPerPost) {
+                try await send(&batch, uploader: uploader, record: &record)
+                encodedUpperBound = 0
+            }
         }
-        return (read, removed, pages)
+        for uuid in deleted {
+            var one = Batch()
+            one.deleted = [uuid]
+            let oneSize = try Self.encodedSize(one.makePayload(settings: settings))
+            if batch.count + 1 > Self.maxPerPost || encodedUpperBound + oneSize > Self.maxPayloadBytes {
+                try await send(&batch, uploader: uploader, record: &record)
+                encodedUpperBound = 0
+            }
+            batch.deleted.append(uuid)
+            encodedUpperBound += oneSize
+            if batch.count >= Self.maxPerPost {
+                try await send(&batch, uploader: uploader, record: &record)
+                encodedUpperBound = 0
+            }
+        }
+        try await send(&batch, uploader: uploader, record: &record)
     }
 
-    /// Invia il blocco corrente; solo dopo il 2xx salva le ancore.
-    private func flush(_ batch: inout Batch, uploader: Uploader, record: inout SyncRecord) async throws {
-        if batch.isEmptyPayload {
-            // Nulla da inviare ma ancore aggiornate (es. tipi senza dati): si salvano subito.
-            AnchorStore.shared.commit(batch.anchors)
-            batch.anchors = [:]
-            return
+    static func encodedSize(_ payload: Payload) throws -> Int {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(payload).count
+    }
+
+    private func send(_ batch: inout Batch, uploader: Uploader, record: inout SyncRecord) async throws {
+        guard !batch.isEmptyPayload else { return }
+        try await ensureCurrent()
+        let payload = batch.makePayload(settings: settings)
+        guard batch.count <= Self.maxPerPost, try Self.encodedSize(payload) <= Self.maxPayloadBytes else {
+            throw Failure.oversizedRecord
         }
-        let payload = batch.makePayload()
         let bytes = try await uploader.send(payload)
-        AnchorStore.shared.commit(batch.anchors)
-        if payload.caratteristiche != nil {
-            UserDefaults.standard.set(true, forKey: AppSettings.Keys.characteristicsSent)
-        }
         record.samples += batch.recordCount
         record.deleted += batch.deleted.count
         record.bytes += bytes
         record.requests += 1
         batch = Batch()
+        try await ensureCurrent()
+    }
+
+    /// A route has its own lifecycle after the workout is saved. Keep its own
+    /// cursor; on a change replay workouts using a separately persisted cursor.
+    /// The route cursor advances only after every workout page was acknowledged.
+    private func reconcileRoutes(uploader: Uploader, record: inout SyncRecord,
+                                 status: inout SyncProgress, progress: @escaping Progress) async throws {
+        let store = AnchorStore.shared
+        let destination = settings.destinationID
+        var pending: RouteReconciliation?
+        if let data = try store.data(for: AnchorStore.routePendingID, destination: destination) {
+            pending = try JSONDecoder().decode(RouteReconciliation.self, from: data)
+        }
+        if pending == nil {
+            var anchor = try store.anchor(for: AnchorStore.routeAnchorID, destination: destination)
+            var changed = anchor == nil // GPS enabled for the first time: backfill.
+            while true {
+                try await ensureCurrent()
+                let query = HKAnchoredObjectQueryDescriptor(
+                    predicates: [.sample(type: HKSeriesType.workoutRoute())], anchor: anchor, limit: Self.maxPerPost)
+                let result = try await query.result(for: Health.store)
+                if !result.addedSamples.isEmpty || !result.deletedObjects.isEmpty { changed = true }
+                anchor = result.newAnchor
+                if result.addedSamples.count + result.deletedObjects.count < Self.maxPerPost { break }
+            }
+            guard let anchor else { throw Failure.invalidRecord }
+            let archived = try AnchorStore.archive(anchor)
+            if !changed {
+                try await ensureCurrent()
+                try store.commit([AnchorStore.routeAnchorID: archived], destination: destination)
+                return
+            }
+            let created = RouteReconciliation(targetAnchor: archived)
+            pending = created
+            try await ensureCurrent()
+            try store.commit([AnchorStore.routePendingID: JSONEncoder().encode(created)], destination: destination)
+        }
+        guard var reconciliation = pending,
+              let entry = HealthCatalog.entries(in: [.allenamenti]).first(where: { $0.kind == .workout }),
+              let type = entry.sampleType else { throw Failure.invalidRecord }
+        var anchor: HKQueryAnchor?
+        if let data = reconciliation.workoutAnchor {
+            anchor = try NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data)
+            guard anchor != nil else { throw CocoaError(.coderReadCorrupt) }
+        }
+        while true {
+            try await ensureCurrent()
+            let query = HKAnchoredObjectQueryDescriptor(predicates: [.sample(type: type)], anchor: anchor, limit: 1)
+            let result = try await query.result(for: Health.store)
+            try await sendPage(result.addedSamples, deleted: result.deletedObjects.map(\.uuid.uuidString),
+                               entry: entry, uploader: uploader, record: &record)
+            let archived = try AnchorStore.archive(result.newAnchor)
+            reconciliation.workoutAnchor = archived
+            try await ensureCurrent()
+            if result.addedSamples.count + result.deletedObjects.count < 1 {
+                try store.commit([AnchorStore.routeAnchorID: reconciliation.targetAnchor,
+                                  entry.id: archived], destination: destination,
+                                 removing: [AnchorStore.routePendingID])
+                break
+            }
+            try store.commit([AnchorStore.routePendingID: JSONEncoder().encode(reconciliation)], destination: destination)
+            anchor = result.newAnchor
+            status.samplesSent = record.samples + record.deleted
+            status.blocksSent = record.requests
+            await progress(status)
+        }
     }
 
     static func pageLimit(_ entry: CatalogEntry, routes: Bool) -> Int {
         switch entry.kind {
-        case .workout: routes ? 20 : 200
+        case .workout: routes ? 1 : 100
         case .electrocardiogram: maxECGPerPost
-        case .audiogram: 200
+        case .audiogram: 100
         default: maxPerPost
         }
     }
@@ -452,12 +550,12 @@ struct Batch {
     var ecgs: [ECGRecord] = []
     var audiograms: [AudiogramRecord] = []
     var moods: [StateOfMindRecord] = []
+    var correlations: [CorrelationRecord] = []
     var deleted: [String] = []
     var characteristics: Characteristics?
-    var anchors: [String: Data] = [:]
 
     var recordCount: Int {
-        quantities.count + categories.count + workouts.count + ecgs.count + audiograms.count + moods.count
+        quantities.count + categories.count + workouts.count + ecgs.count + audiograms.count + moods.count + correlations.count
     }
 
     var count: Int { recordCount + deleted.count }
@@ -468,12 +566,12 @@ struct Batch {
         switch entry.kind {
         case .quantity:
             guard let unit = entry.unit else { return }
-            for case let s as HKQuantitySample in samples { quantities.append(Serializer.quantity(s, unit: unit)) }
+            for case let s as HKQuantitySample in samples { quantities.append(try await Serializer.quantity(s, unit: unit, store: Health.store)) }
         case .category:
             for case let s as HKCategorySample in samples { categories.append(Serializer.category(s)) }
         case .workout:
             for case let w as HKWorkout in samples {
-                workouts.append(await Serializer.workout(w, store: Health.store, includeRoute: includeRoutes))
+                workouts.append(try await Serializer.workout(w, store: Health.store, includeRoute: includeRoutes))
             }
         case .electrocardiogram:
             // Un ECG alla volta: il tracciato viene letto tutto prima di passare al successivo.
@@ -484,10 +582,26 @@ struct Batch {
             for case let a as HKAudiogramSample in samples { audiograms.append(Serializer.audiogram(a)) }
         case .stateOfMind:
             for case let m as HKStateOfMind in samples { moods.append(Serializer.stateOfMind(m)) }
+        case .correlation:
+            for case let c as HKCorrelation in samples { correlations.append(Serializer.correlation(c)) }
         }
     }
 
-    func makePayload() -> Payload {
+    func merging(_ other: Batch) -> Batch {
+        var next = self
+        next.quantities += other.quantities
+        next.categories += other.categories
+        next.workouts += other.workouts
+        next.ecgs += other.ecgs
+        next.audiograms += other.audiograms
+        next.moods += other.moods
+        next.correlations += other.correlations
+        next.deleted += other.deleted
+        if let value = other.characteristics { next.characteristics = value }
+        return next
+    }
+
+    func makePayload(settings: SettingsSnapshot) -> Payload {
         Payload(
             dispositivo: Uploader.deviceModel,
             inviato: ISO.string(Date()),
@@ -497,8 +611,11 @@ struct Batch {
             ecg: ecgs.isEmpty ? nil : ecgs,
             audiogrammi: audiograms.isEmpty ? nil : audiograms,
             stati_d_animo: moods.isEmpty ? nil : moods,
+            correlazioni: correlations.isEmpty ? nil : correlations,
             eliminati: deleted.isEmpty ? nil : deleted,
-            caratteristiche: characteristics)
+            caratteristiche: characteristics,
+            installation_id: settings.installationID,
+            destination_id: settings.destinationID)
     }
 }
 
@@ -506,16 +623,18 @@ struct Batch {
 enum ConnectionTest {
     static func run(endpoint: String, token: String, gzip: Bool) async -> Result<Int, UploadError> {
         guard let url = AppSettings.validURL(endpoint) else {
-            return .failure(.network(String(localized: "Indirizzo non valido: usa https:// (http solo in rete locale).")))
+            return .failure(.invalidEndpoint)
         }
         let uploader = Uploader(endpoint: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines), gzip: gzip)
         do {
-            let bytes = try await uploader.send(TestPayload(), attempts: 1)
+            let snapshot = await MainActor.run { AppSettings.shared.snapshot }
+            let payload = TestPayload(installation_id: snapshot.installationID, destination_id: snapshot.destinationID)
+            let bytes = try await uploader.send(payload, attempts: 1)
             return .success(bytes)
         } catch let e as UploadError {
             return .failure(e)
         } catch {
-            return .failure(.network(error.localizedDescription))
+            return .failure(.network((error as NSError).code))
         }
     }
 }
