@@ -17,8 +17,8 @@ enum DataGroup: String, CaseIterable, Identifiable, Codable, Sendable {
         case .ecg: "ECG"
         case .sonno: "Sonno"
         case .respirazione: "Respirazione"
-        case .corpo: "Corpo"
-        case .glicemia: "Glicemia e alcol"
+        case .corpo: "身体・視力処方"
+        case .glicemia: "血糖・服薬・アルコール"
         case .nutrizione: "Nutrizione"
         case .udito: "Udito"
         case .mindfulness: "Mindfulness"
@@ -85,6 +85,14 @@ enum EntryKind: Sendable, Equatable {
     case electrocardiogram
     case audiogram
     case stateOfMind
+    case heartbeatSeries, assessment, visionPrescription, medicationDoseEvent
+
+    var isExtended: Bool {
+        switch self {
+        case .heartbeatSeries, .assessment, .visionPrescription, .medicationDoseEvent: true
+        default: false
+        }
+    }
 }
 
 /// Una voce del catalogo: un identificatore HealthKit, il suo gruppo e la sua unità.
@@ -96,6 +104,19 @@ struct CatalogEntry: Sendable, Identifiable, Hashable {
     let immediate: Bool
 
     var id: String { identifier }
+
+    /// Readable does not imply accepted by HKObserverQuery. In particular,
+    /// passing vision prescriptions raises an Objective-C exception during
+    /// query construction (before execute or a Swift error handler can run).
+    /// HealthKit exposes no public supportsObserver/supportsBackgroundDelivery
+    /// capability flag. Keep these known unsupported kinds out of observers;
+    /// ordinary foreground/background scans continue to read them.
+    var canObserve: Bool {
+        switch kind {
+        case .correlation, .visionPrescription: false
+        default: true
+        }
+    }
 
     static func == (a: CatalogEntry, b: CatalogEntry) -> Bool { a.identifier == b.identifier }
     func hash(into h: inout Hasher) { h.combine(identifier) }
@@ -117,6 +138,14 @@ struct CatalogEntry: Sendable, Identifiable, Hashable {
             return HKObjectType.audiogramSampleType()
         case .stateOfMind:
             return HKObjectType.stateOfMindType()
+        case .heartbeatSeries:
+            return HKSeriesType.heartbeat()
+        case .assessment:
+            return HKScoredAssessmentType(HKScoredAssessmentTypeIdentifier(rawValue: identifier))
+        case .visionPrescription:
+            return HKObjectType.visionPrescriptionType()
+        case .medicationDoseEvent:
+            return HKObjectType.medicationDoseEventType()
         }
     }
 
@@ -190,6 +219,8 @@ enum HealthCatalog {
         ("RestingHeartRate", .cuore, "count/min"),
         ("WalkingHeartRateAverage", .cuore, "count/min"),
         ("HeartRateVariabilitySDNN", .cuore, "ms"),
+        ("HeartRateVariabilityRMSSD", .cuore, "ms"),
+        ("NikeFuel", .attivita, "count"),
         ("HeartRateRecoveryOneMinute", .cuore, "count/min"),
         ("AtrialFibrillationBurden", .cuore, "%"),
         ("VO2Max", .cuore, "ml/kg·min"),
@@ -271,6 +302,8 @@ enum HealthCatalog {
 
     /// (nome breve, gruppo, consegna immediata)
     private static let categories: [(String, DataGroup, Bool)] = [
+        ("BleedingAfterMenopause", .ciclo, false),
+        ("MenopausalState", .ciclo, false),
         ("AppleStandHour", .attivita, false),
         ("AppleWalkingSteadinessEvent", .attivita, true),
         ("HighHeartRateEvent", .cuore, true),
@@ -341,6 +374,18 @@ enum HealthCatalog {
         out.append(CatalogEntry(identifier: "HKDataTypeIdentifierStateOfMind", group: .mindfulness, kind: .stateOfMind, immediate: true))
         out.append(CatalogEntry(identifier: HKCorrelationTypeIdentifier.bloodPressure.rawValue,
                                 group: .cuore, kind: .correlation, immediate: false))
+        out.append(CatalogEntry(identifier: HKCorrelationTypeIdentifier.food.rawValue,
+                                group: .nutrizione, kind: .correlation, immediate: false))
+        out.append(CatalogEntry(identifier: HKSeriesType.heartbeat().identifier,
+                                group: .cuore, kind: .heartbeatSeries, immediate: true))
+        for identifier in [HKScoredAssessmentTypeIdentifier.GAD7, .PHQ9] {
+            out.append(CatalogEntry(identifier: identifier.rawValue, group: .mindfulness,
+                                    kind: .assessment, immediate: false))
+        }
+        out.append(CatalogEntry(identifier: HKObjectType.visionPrescriptionType().identifier,
+                                group: .corpo, kind: .visionPrescription, immediate: false))
+        out.append(CatalogEntry(identifier: HKObjectType.medicationDoseEventType().identifier,
+                                group: .glicemia, kind: .medicationDoseEvent, immediate: true))
         return out
     }()
 
@@ -380,7 +425,7 @@ enum HealthCatalog {
         // Le correlazioni usano i permessi dei campioni contenuti. Non hanno
         // un'autorizzazione separata: chiediamo sistolica e diastolica già nel gruppo Cuore.
         var set = Set<HKObjectType>(entries(in: groups)
-            .filter { $0.kind != .correlation }.compactMap(\.sampleType))
+            .filter { $0.kind != .correlation && $0.kind != .visionPrescription && $0.kind != .medicationDoseEvent }.compactMap(\.sampleType))
         if groups.contains(.corpo) { set.formUnion(characteristicTypes) }
         if groups.contains(.attivita) { set.insert(HKObjectType.activitySummaryType()) }
         if includeRoutes, groups.contains(.allenamenti) { set.insert(HKSeriesType.workoutRoute()) }

@@ -63,6 +63,38 @@ struct SerializationContractTests {
         try check(quantity.metadati?[HKMetadataKeyTimeZone] == "Asia/Tokyo" && quantity.metadati?["synthetic-date"] == expected, "metadata_timezone_preserved")
         try check(quantity.provenienza?.device?.local_identifier == "synthetic-local-id"
                   && quantity.provenienza?.device?.udi_device_identifier == "synthetic-udi", "original_device_provenance")
+        let typedQuantityMetadata = try json(quantity)["metadati_typed"] as! [String: Any]
+        try check((typedQuantityMetadata["synthetic-date"] as? [String: Any])?["type"] as? String == "date", "record_includes_typed_metadata")
+        let metadataQuantity = HKQuantity(unit: .meter(), doubleValue: 123.456789)
+        let typed = Serializer.typedMetadata([
+            "true": true, "one": NSNumber(value: 1), "fraction": NSNumber(value: 1.23456789),
+            "date": t, "quantity": metadataQuantity,
+            "unsigned": NSNumber(value: UInt64.max), "signed": NSNumber(value: Int64.min),
+            "decimal": NSDecimalNumber(string: "1234567890.1234567890123456789"),
+            "array": [false, ["nested": "value"], NSNull()] as [Any],
+            "unknown": URL(string: "https://example.invalid/synthetic")!, "nonfinite": Double.infinity
+        ])!
+        let typedJSON = try json(typed)
+        try check(typedJSON["true"] as? Bool == true && (typedJSON["one"] as? [String: Any])?["type"] as? String == "number", "boolean_and_number_remain_distinct")
+        try check(((typedJSON["fraction"] as? [String: Any])?["value"] as? Double) == 1.23456789, "typed_fraction_not_rounded")
+        try check(((typedJSON["signed"] as? [String: Any])?["value"] as? NSNumber)?.int64Value == Int64.min
+                  && ((typedJSON["unsigned"] as? [String: Any])?["value"] as? NSNumber)?.uint64Value == UInt64.max, "integer_extremes_preserved")
+        try check((typedJSON["decimal"] as? [String: Any])?["value"] as? String == "1234567890.1234567890123456789", "decimal_keeps_original_precision")
+        let array = typedJSON["array"] as! [Any]
+        try check(array[0] as? Bool == false && (array[1] as? [String: Any])?["nested"] as? String == "value"
+                  && array[2] is NSNull, "typed_array_dictionary_and_null")
+        try check((typedJSON["unknown"] as? [String: Any])?["representation"] as? String == "description_only", "unsupported_metadata_is_explicit")
+        try check(((typedJSON["nonfinite"] as? [String: Any])?["value"] as? [String: Any])?["type"] as? String == "non_finite_number", "nonfinite_metadata_is_explicit_valid_json")
+        let archivedQuantity = typedJSON["quantity"] as! [String: Any]
+        let originalQuantity = try NSKeyedUnarchiver.unarchivedObject(ofClass: HKQuantity.self,
+            from: Data(base64Encoded: archivedQuantity["archive_base64"] as! String)!)!
+        try check(archivedQuantity["type"] as? String == "HKQuantity"
+                  && originalQuantity.doubleValue(for: .meter()) == 123.456789, "quantity_original_secure_archive_round_trip")
+        try check((typedJSON["date"] as? [String: Any])?["value"] as? String == expected, "typed_date_submillisecond_value")
+        let discrete = quantity.statistiche_discrete
+        try check(discrete?.minimo == 123.456789 && discrete?.media == 123.456789
+                  && discrete?.massimo == 123.456789 && discrete?.ultimo == 123.456789
+                  && discrete?.intervallo_ultimo.inizio == expected, "discrete_aggregates_and_recent_interval")
         var seriesQuantity = quantity
         seriesQuantity.numero_quantita = 2
         seriesQuantity.serie = [QuantitySeriesPoint(valore: 1.123456789, inizio: expected, fine: expected),
@@ -87,6 +119,66 @@ struct SerializationContractTests {
         workout.percorso = []
         let emptyRoute = try json(workout)
         try check(withoutRoute["percorso"] == nil && (emptyRoute["percorso"] as? [Any])?.isEmpty == true, "empty_route_is_explicit_replacement")
+        let lap = HKWorkoutEvent(type: .lap, dateInterval: DateInterval(start: t, duration: 3.25),
+                                  metadata: ["synthetic-number": NSNumber(value: 7)])
+        let lapRecord = Serializer.workoutEvent(lap)
+        let lapJSON = try json(lapRecord)
+        try check(lapRecord.tipo_raw == HKWorkoutEventType.lap.rawValue && lapRecord.inizio == expected
+                  && lapRecord.fine == ISO.string(t.addingTimeInterval(3.25)), "event_type_and_true_interval_preserved")
+        try check(lapJSON["metadati_typed"] != nil, "event_keeps_typed_metadata")
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .swimming
+        configuration.locationType = .indoor
+        configuration.swimmingLocationType = .pool
+        configuration.lapLength = HKQuantity(unit: .meter(), doubleValue: 25)
+        let activity = HKWorkoutActivity(workoutConfiguration: configuration, start: t,
+                                         end: t.addingTimeInterval(65), metadata: ["synthetic": true])
+        let activityRecord = Serializer.workoutActivity(activity, units: [:])
+        let activityJSON = try json(activityRecord)
+        try check(activityRecord.uuid == activity.uuid.uuidString && activityRecord.configurazione.attivita_raw == HKWorkoutActivityType.swimming.rawValue
+                  && activityRecord.configurazione.luogo_raw == HKWorkoutSessionLocationType.indoor.rawValue
+                  && activityRecord.configurazione.luogo_nuoto_raw == HKWorkoutSwimmingLocationType.pool.rawValue
+                  && activityRecord.configurazione.lunghezza_vasca_m == 25, "activity_identity_and_pool_configuration")
+        try check(activityRecord.inizio == expected && activityRecord.fine == ISO.string(t.addingTimeInterval(65))
+                  && activityJSON["metadati_typed"] != nil, "activity_dates_and_typed_metadata")
+        let syntheticWorkout = HKWorkout(activityType: .running, start: t, end: t.addingTimeInterval(10),
+            workoutEvents: [lap], totalEnergyBurned: HKQuantity(unit: .kilocalorie(), doubleValue: 2.5),
+            totalDistance: HKQuantity(unit: .meter(), doubleValue: 30), metadata: ["synthetic": "test"])
+        let energyType = HKQuantityType(.activeEnergyBurned)
+        let distanceType = HKQuantityType(.distanceWalkingRunning)
+        let syntheticRecord = Serializer.workoutRecord(syntheticWorkout, units: [energyType: .kilocalorie(), distanceType: .meter()])
+        try check(syntheticRecord.attivita_raw == HKWorkoutActivityType.running.rawValue
+                  && syntheticRecord.eventi?.first?.tipo_raw == HKWorkoutEventType.lap.rawValue, "workout_preserves_raw_type_and_events")
+        if !syntheticWorkout.allStatistics.isEmpty {
+            let unresolved = Serializer.workoutStatistics(syntheticWorkout.allStatistics, units: [:])
+            try check(unresolved.count == syntheticWorkout.allStatistics.count
+                      && unresolved.values.allSatisfy { $0.conversione == "unit_unavailable" && $0.quantita_originali != nil },
+                      "unresolved_units_never_silently_drop_statistics")
+        }
+        let routePoint = RoutePoint(lat: 35.123456789, lon: 139.987654321, alt: 5.5, t: expected,
+                                     precisione_orizzontale_m: 3, precisione_verticale_m: 4,
+                                     velocita_m_s: 2.5, precisione_velocita_m_s: 0.2, direzione_gradi: 90,
+                                     precisione_direzione_gradi: 5)
+        let routeOne = WorkoutRouteRecord(uuid: UUID().uuidString, inizio: expected, fine: expected,
+                                          fonte: "synthetic-one", punti: [routePoint], provenienza: quantity.provenienza,
+                                          metadati_typed: Serializer.typedMetadata(["route": 1]))
+        let routeTwo = WorkoutRouteRecord(uuid: UUID().uuidString, inizio: expected, fine: expected,
+                                          fonte: "synthetic-two", punti: [routePoint])
+        workout.percorso = nil
+        workout.percorsi = [routeOne, routeTwo]
+        let routedJSON = try json(workout)
+        let routesJSON = routedJSON["percorsi"] as! [[String: Any]]
+        try check(routedJSON["percorso"] == nil && routesJSON.count == 2
+                  && routesJSON[0]["uuid"] as? String != routesJSON[1]["uuid"] as? String, "separate_routes_without_flattened_duplicate")
+        try check(routesJSON[0]["fonte"] as? String == "synthetic-one" && routesJSON[0]["provenienza"] != nil
+                  && routesJSON[0]["metadati_typed"] != nil, "route_identity_provenance_and_metadata")
+        let pointJSON = (routesJSON[0]["punti"] as! [[String: Any]])[0]
+        try check(pointJSON["lat"] as? Double == 35.123456789 && pointJSON["lon"] as? Double == 139.987654321
+                  && pointJSON["precisione_orizzontale_m"] as? Double == 3
+                  && pointJSON["precisione_direzione_gradi"] as? Double == 5, "route_coordinates_and_accuracy_not_rounded")
+        workout.percorsi = []
+        let noRoutesJSON = try json(workout)
+        try check(noRoutesJSON["percorsi"] as? [Any] != nil, "empty_route_collection_is_explicit")
 
         let waveform = [1.123456789, -0.0123456789]
         let offsets = [0.0, 0.001953125]

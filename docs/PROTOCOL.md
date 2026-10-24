@@ -71,7 +71,7 @@ Cookie・キャッシュ・共有認証情報を使わない ephemeral URLSessio
 
 ## サイズとカーソル
 
-通常 POST はサンプルと削除 UUID の合計最大 500 件、非圧縮 JSON 最大 8 MiB。GPS 付きワークアウトは 1 件ずつ、ECG は最大 5 件をまとめます。バイト上限が先に効く場合はそこで区切ります。単独サンプルが 8 MiB を超える場合は明示的に失敗し、黙って捨てません。
+通常 POST はサンプルと削除 UUID の合計最大 500 件、非圧縮 JSON 最大 8 MiB。GPS 付きワークアウトは 1 件ずつ、ECG は最大 5 件をまとめます。バイト上限が先に効く場合はそこで区切ります。単独サンプルの大きなJSONは `frammenti` を使って分割します。各断片は元recordのUUID・section・SHA256・0始まりindex・total・data_base64を持ち、元JSONは最大256MiB、raw断片は最大2MiBです。各ACKは断片の永続保存を表し、最後の断片ではSHA256/JSON検証とsample確定も同じtransactionで行います。全断片ACK後にのみanchorを進めます。
 
 HealthKit から読んだ 1 ページを分割した場合は、全 POST の ACK を確認してからそのページの anchor を保存します。途中失敗やディスク保存失敗の後は同じページを再送できます。受信側は UUID upsert と削除 tombstone により、二重登録や古い再送による復活を防ぎます。
 
@@ -182,3 +182,16 @@ Audiogram の各 point は `frequenza_hz`、任意の `sinistro_dbhl`・`destro_
 ```
 
 これは選択した範囲でスキャン処理が終わったことを示します。全 HealthKit 項目の許可、すべてのデータの存在、Apple 純正の集計との一致、現在までの即時同期を保証しません。読取可否をアプリから完全に知ることはできず、空の結果を不存在の証拠にしません。
+
+
+## Capture v3 additions (protocol v2 envelope)
+
+運動は `attivita_raw`, `eventi`, `attivita_dettaglio`, `campioni_associati`, `ambito_campioni_associati`, `relazioni_sforzo` を追加。GPSは新 `percorsi:[{uuid,inizio,fine,fonte,provenienza,metadati,metadati_typed,punti:[RoutePoint]}]` を使い、旧 `percorso` と二重化しません。ルートの省略は未取得、空配列は成功して空を意味します。旧v1/v2形式の受信は維持します。
+
+各recordの `metadati_typed` は型タグ付きの再帰JSON。`metadati` の互換文字列も残ります。数量は `statistiche_discrete` にAppleの元集計値と最終計測区間を保存します。
+
+追加sectionは `heartbeat_series`, `valutazioni`, `prescrizioni_vista`, `dosi_farmaci`, `riepiloghi_attivita`, `farmaci`。前4つは実HKSample UUIDを持つrecord。後2つはHealthBridgeの決定的snapshot UUIDを持つ単一recordで、`identity_kind:healthbridge_snapshot`, `read_completeness:unknown`, `records:[...]` を含みます。日別サマリーは全日、登録薬はアーカイブ済みを含む、現在アクセス可能な全件をquery成功後に原子的upsertします。未送信のsnapshot digestは確定しません。
+
+`scan_partial` は `pending_types` に明示的権限エラーがあった型識別子を載せます。`scan_complete` は従来どおり選択範囲を走査できたことだけを表し、HealthKitは読取拒否とデータ不存在を常に区別させるわけではありません。
+
+フラグメントの`index=0`は送信開始/再開始を表し、同じinstallation/destination/record UUIDについて別SHAの古い未完集合だけを整理します。同SHAの既受信部分、完了manifest、他UUID/namespaceは維持します。同じidentityからは送信を直列化してください。これにより毎回生成時刻が変わるsnapshotでも、中断を繰り返した後に自力再開できます。

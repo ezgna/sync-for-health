@@ -1,4 +1,5 @@
 import CoreLocation
+import CoreFoundation
 import Foundation
 import HealthKit
 
@@ -41,8 +42,71 @@ enum Serializer {
         return out
     }
 
+    /// A differenza della mappa compatibile sopra, conserva i tipi e la struttura.
+    static func typedMetadata(_ m: [String: Any]?) -> [String: MetadataValue]? {
+        guard let m, !m.isEmpty else { return nil }
+        return m.mapValues(typedMetadataValue)
+    }
+
+    static func typedMetadataValue(_ value: Any) -> MetadataValue {
+        switch value {
+        case is NSNull: return .null
+        case let date as Date:
+            return .object(["type": .string("date"), "value": .string(ISO.string(date)),
+                            "seconds_since_reference_date": finiteNumber(date.timeIntervalSinceReferenceDate)])
+        case let quantity as HKQuantity:
+            var object: [String: MetadataValue] = ["type": .string("HKQuantity"),
+                                                   "description": .string(quantity.description)]
+            // HKQuantity has no public original-unit accessor. A secure archive
+            // preserves the original object; canonical value/unit aids JSON users.
+            if let data = try? NSKeyedArchiver.archivedData(withRootObject: quantity, requiringSecureCoding: true) {
+                object["archive_format"] = .string("NSKeyedArchiver.secureCoding")
+                object["archive_base64"] = .string(data.base64EncodedString())
+            } else {
+                object["archive_status"] = .string("unavailable")
+            }
+            if let unit = metadataUnit(for: quantity) {
+                object["value"] = finiteNumber(quantity.doubleValue(for: unit))
+                object["unit"] = .string(unit.unitString)
+                object["unit_representation"] = .string("canonical_conversion")
+            }
+            return .object(object)
+        case let decimal as NSDecimalNumber:
+            return .object(["type": .string("decimal"), "value": .string(decimal.stringValue)])
+        case let number as NSNumber:
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return .bool(number.boolValue) }
+            let objc = String(cString: number.objCType)
+            let numeric: MetadataValue
+            if ["C", "S", "I", "L", "Q"].contains(objc) {
+                numeric = .unsigned(number.uint64Value)
+            } else if ["c", "s", "i", "l", "q"].contains(objc) {
+                numeric = .integer(number.int64Value)
+            } else {
+                numeric = finiteNumber(number.doubleValue)
+            }
+            return .object(["type": .string("number"), "objc_type": .string(objc), "value": numeric])
+        case let string as String: return .string(string)
+        case let array as [Any]: return .array(array.map(typedMetadataValue))
+        case let dictionary as [String: Any]: return .object(dictionary.mapValues(typedMetadataValue))
+        default:
+            return .object(["type": .string(String(reflecting: type(of: value))),
+                            "representation": .string("description_only"),
+                            "description": .string(String(describing: value))])
+        }
+    }
+
+    private static func finiteNumber(_ value: Double) -> MetadataValue {
+        value.isFinite ? .number(value) : .object(["type": .string("non_finite_number"), "value": .string(String(value))])
+    }
+
+    private static func metadataUnit(for quantity: HKQuantity) -> HKUnit? {
+        // Only construct units known valid by the app; unknown dimensions keep
+        // the archived original rather than guessing by parsing description text.
+        HealthCatalog.allEntries.compactMap(\.unit).first { quantity.is(compatibleWith: $0) }
+    }
+
     static func quantity(_ s: HKQuantitySample, unit: HKUnit) -> QuantityRecord {
-        QuantityRecord(
+        var record = QuantityRecord(
             uuid: s.uuid.uuidString,
             tipo: s.quantityType.identifier,
             valore: s.quantity.doubleValue(for: unit),
@@ -52,7 +116,17 @@ enum Serializer {
             fonte: source(s),
             metadati: metadata(s.metadata),
             provenienza: provenance(s),
-            numero_quantita: s.count)
+            numero_quantita: s.count,
+            metadati_typed: typedMetadata(s.metadata))
+        if let discrete = s as? HKDiscreteQuantitySample {
+            record.statistiche_discrete = DiscreteQuantityRecord(
+                unita: unit.unitString, minimo: discrete.minimumQuantity.doubleValue(for: unit),
+                media: discrete.averageQuantity.doubleValue(for: unit),
+                massimo: discrete.maximumQuantity.doubleValue(for: unit),
+                ultimo: discrete.mostRecentQuantity.doubleValue(for: unit),
+                intervallo_ultimo: interval(discrete.mostRecentQuantityDateInterval))
+        }
+        return record
     }
 
     /// Il valore del campione può essere solo un riepilogo di molte misure.
@@ -89,7 +163,8 @@ enum Serializer {
             fine: ISO.string(s.endDate),
             fonte: source(s),
             metadati: metadata(s.metadata),
-            provenienza: provenance(s))
+            provenienza: provenance(s),
+            metadati_typed: typedMetadata(s.metadata))
     }
 
     static func correlation(_ s: HKCorrelation) -> CorrelationRecord {
@@ -98,7 +173,7 @@ enum Serializer {
             inizio: ISO.string(s.startDate), fine: ISO.string(s.endDate), fonte: source(s),
             membri: s.objects.map { CorrelationMember(uuid: $0.uuid.uuidString, tipo: $0.sampleType.identifier) }
                 .sorted { $0.uuid < $1.uuid },
-            metadati: metadata(s.metadata), provenienza: provenance(s))
+            metadati: metadata(s.metadata), provenienza: provenance(s), metadati_typed: typedMetadata(s.metadata))
     }
 
     /// ECG con riepilogo e tracciato completo (derivazione simile a DI, in µV).
@@ -171,7 +246,8 @@ enum Serializer {
             fonte: source(e),
             metadati: metadata(e.metadata),
             provenienza: provenance(e),
-            numero_misure: e.numberOfVoltageMeasurements)
+            numero_misure: e.numberOfVoltageMeasurements,
+            metadati_typed: typedMetadata(e.metadata))
     }
 
     static func audiogram(_ a: HKAudiogramSample) -> AudiogramRecord {
@@ -198,7 +274,7 @@ enum Serializer {
         }
         return AudiogramRecord(uuid: a.uuid.uuidString, inizio: ISO.string(a.startDate),
                                fine: ISO.string(a.endDate), fonte: source(a), punti: points,
-                               metadati: metadata(a.metadata), provenienza: provenance(a))
+                               metadati: metadata(a.metadata), provenienza: provenance(a), metadati_typed: typedMetadata(a.metadata))
     }
 
     static func stateOfMind(_ s: HKStateOfMind) -> StateOfMindRecord {
@@ -217,63 +293,182 @@ enum Serializer {
             etichette_raw: s.labels.map(\.rawValue),
             associazioni_raw: s.associations.map(\.rawValue),
             metadati: metadata(s.metadata),
-            provenienza: provenance(s))
+            provenienza: provenance(s),
+            metadati_typed: typedMetadata(s.metadata))
     }
 
-    /// Allenamento con statistiche; il percorso GPS solo se richiesto nelle impostazioni.
-    static func workout(_ w: HKWorkout, store: HKHealthStore, includeRoute: Bool) async throws -> WorkoutRecord {
-        try Task.checkCancellation()
-        var stats: [String: WorkoutStat] = [:]
-        var energy: Double?
-        var distances: [Double] = []
-        for (type, s) in w.allStatistics {
-            let unit = HealthCatalog.entry(for: type.identifier)?.unit ?? .count()
-            guard type.is(compatibleWith: unit) else { continue }
-            var stat = WorkoutStat(unita: unit.unitString)
-            stat.somma = s.sumQuantity()?.doubleValue(for: unit)
-            stat.media = s.averageQuantity()?.doubleValue(for: unit)
-            stat.minimo = s.minimumQuantity()?.doubleValue(for: unit)
-            stat.massimo = s.maximumQuantity()?.doubleValue(for: unit)
-            stats[type.identifier] = stat
-            if type.identifier == HKQuantityTypeIdentifier.activeEnergyBurned.rawValue {
-                energy = stat.somma
-            } else if type.identifier.hasPrefix("HKQuantityTypeIdentifierDistance"),
-                      type.is(compatibleWith: .meter()), let sum = s.sumQuantity() {
-                distances.append(sum.doubleValue(for: .meter()))
+    static func interval(_ value: DateInterval) -> RecordInterval {
+        RecordInterval(inizio: ISO.string(value.start), fine: ISO.string(value.end))
+    }
+
+    static func workoutEvent(_ event: HKWorkoutEvent) -> WorkoutEventRecord {
+        WorkoutEventRecord(tipo_raw: event.type.rawValue,
+                           inizio: ISO.string(event.dateInterval.start), fine: ISO.string(event.dateInterval.end),
+                           metadati: metadata(event.metadata), metadati_typed: typedMetadata(event.metadata))
+    }
+
+    static func workoutConfiguration(_ configuration: HKWorkoutConfiguration) -> WorkoutConfigurationRecord {
+        WorkoutConfigurationRecord(attivita: activityName(configuration.activityType),
+                                   attivita_raw: configuration.activityType.rawValue,
+                                   luogo_raw: configuration.locationType.rawValue,
+                                   luogo_nuoto_raw: configuration.swimmingLocationType.rawValue,
+                                   lunghezza_vasca_m: configuration.lapLength?.doubleValue(for: .meter()))
+    }
+
+    static func workoutActivity(_ activity: HKWorkoutActivity, units: [HKQuantityType: HKUnit]) -> WorkoutActivityRecord {
+        WorkoutActivityRecord(uuid: activity.uuid.uuidString,
+                              configurazione: workoutConfiguration(activity.workoutConfiguration),
+                              inizio: ISO.string(activity.startDate), fine: activity.endDate.map(ISO.string),
+                              durata_s: activity.duration, eventi: activity.workoutEvents.map(workoutEvent),
+                              statistiche: workoutStatistics(activity.allStatistics, units: units),
+                              metadati: metadata(activity.metadata), metadati_typed: typedMetadata(activity.metadata))
+    }
+
+    /// Statistics for unknown types must remain in the archive. If a convertible
+    /// unit cannot be obtained, preserve the original HKQuantity objects explicitly.
+    static func workoutStatistics(_ statistics: [HKQuantityType: HKStatistics],
+                                  units: [HKQuantityType: HKUnit]) -> [String: WorkoutStat] {
+        var output: [String: WorkoutStat] = [:]
+        for (type, stat) in statistics {
+            let unit = units[type]
+            let values = ["somma": stat.sumQuantity(), "media": stat.averageQuantity(),
+                          "minimo": stat.minimumQuantity(), "massimo": stat.maximumQuantity(),
+                          "ultimo": stat.mostRecentQuantity()].compactMapValues { $0 }
+            var record = WorkoutStat(unita: unit?.unitString ?? "")
+            record.inizio = ISO.string(stat.startDate)
+            record.fine = ISO.string(stat.endDate)
+            record.intervallo_ultimo = stat.mostRecentQuantityDateInterval().map(interval)
+            record.durata_s = stat.duration()?.doubleValue(for: .second())
+            if let unit, values.values.allSatisfy({ $0.is(compatibleWith: unit) }) {
+                record.somma = values["somma"]?.doubleValue(for: unit)
+                record.media = values["media"]?.doubleValue(for: unit)
+                record.minimo = values["minimo"]?.doubleValue(for: unit)
+                record.massimo = values["massimo"]?.doubleValue(for: unit)
+                record.ultimo = values["ultimo"]?.doubleValue(for: unit)
+            } else {
+                record.conversione = unit == nil ? "unit_unavailable" : "incompatible_quantity"
+                record.quantita_originali = values.mapValues(typedMetadataValue)
+            }
+            output[type.identifier] = record
+        }
+        return output
+    }
+
+    private static func workoutUnits(_ types: Set<HKQuantityType>, store: HKHealthStore) async throws -> [HKQuantityType: HKUnit] {
+        var units: [HKQuantityType: HKUnit] = [:]
+        var unknown: Set<HKQuantityType> = []
+        for type in types {
+            if let unit = HealthCatalog.entry(for: type.identifier)?.unit, type.is(compatibleWith: unit) {
+                units[type] = unit
+            } else {
+                unknown.insert(type)
             }
         }
-        var record = WorkoutRecord(
-            uuid: w.uuid.uuidString,
-            attivita: activityName(w.workoutActivityType),
-            inizio: ISO.string(w.startDate),
-            fine: ISO.string(w.endDate),
-            durata_s: w.duration,
-            energia_kcal: energy,
-            // Un multisport può avere più distanze. Non sceglierne una in ordine casuale.
-            distanza_m: distances.count == 1 ? distances[0] : nil,
-            fonte: source(w),
-            statistiche: stats.isEmpty ? nil : stats,
-            metadati: metadata(w.metadata),
-            provenienza: provenance(w))
+        if !unknown.isEmpty {
+            try Task.checkCancellation()
+            for (type, unit) in try await store.preferredUnits(for: unknown) where type.is(compatibleWith: unit) {
+                units[type] = unit
+            }
+        }
+        return units
+    }
+
+    /// Pure conversion shared by live export and synthetic contract tests.
+    static func workoutRecord(_ w: HKWorkout, units: [HKQuantityType: HKUnit]) -> WorkoutRecord {
+        let stats = workoutStatistics(w.allStatistics, units: units)
+        // Summary fields always use their declared units, regardless of preferred units.
+        let energyType = HKQuantityType(.activeEnergyBurned)
+        let energy = w.allStatistics[energyType]?.sumQuantity()?.doubleValue(for: .kilocalorie())
+        var distances: [Double] = []
+        for (type, stat) in w.allStatistics where type.identifier.hasPrefix("HKQuantityTypeIdentifierDistance")
+            && type.is(compatibleWith: .meter()) {
+            if let total = stat.sumQuantity() { distances.append(total.doubleValue(for: .meter())) }
+        }
+        return WorkoutRecord(
+            uuid: w.uuid.uuidString, attivita: activityName(w.workoutActivityType),
+            inizio: ISO.string(w.startDate), fine: ISO.string(w.endDate), durata_s: w.duration,
+            energia_kcal: energy, distanza_m: distances.count == 1 ? distances[0] : nil,
+            fonte: source(w), statistiche: stats.isEmpty ? nil : stats,
+            metadati: metadata(w.metadata), provenienza: provenance(w),
+            metadati_typed: typedMetadata(w.metadata), attivita_raw: w.workoutActivityType.rawValue,
+            eventi: w.workoutEvents.map { $0.map(workoutEvent) },
+            attivita_dettaglio: w.workoutActivities.map { workoutActivity($0, units: units) })
+    }
+
+    /// Allenamento con eventi e vere suddivisioni multisport, non ricostruite dagli orari.
+    static func workout(_ w: HKWorkout, store: HKHealthStore, includeRoute: Bool) async throws -> WorkoutRecord {
+        try Task.checkCancellation()
+        var allTypes = Set(w.allStatistics.keys)
+        for activity in w.workoutActivities { allTypes.formUnion(activity.allStatistics.keys) }
+        let units = try await workoutUnits(allTypes, store: store)
+        var record = workoutRecord(w, units: units)
+        // Only query quantity types actually represented in this workout's statistics.
+        // One multi-type paged query avoids a request per each of the app's 100+ types.
+        record.ambito_campioni_associati = allTypes.map(\.identifier).sorted()
+        record.campioni_associati = try await associatedSamples(for: w, types: allTypes, store: store)
+        if #available(iOS 18.0, macOS 15.0, *) {
+            record.relazioni_sforzo = try await effortRelationships(for: w, store: store)
+        }
         if includeRoute {
-            // [] significa che il percorso è stato letto ed è vuoto: permette di
-            // eliminare nel ricevitore un percorso rimosso, invece di conservarlo.
-            record.percorso = try await route(for: w, store: store)
+            // [] means the API returned no readable route. HealthKit does not
+            // distinguish missing data from denied permission.
+            record.percorsi = try await routes(for: w, store: store)
         }
         try Task.checkCancellation()
         return record
     }
 
-    /// Legge i punti GPS di un allenamento (HKWorkoutRoute).
-    static func route(for workout: HKWorkout, store: HKHealthStore) async throws -> [RoutePoint] {
+    private static func associatedSamples(for workout: HKWorkout, types: Set<HKQuantityType>,
+                                          store: HKHealthStore) async throws -> [WorkoutSampleReference] {
+        guard !types.isEmpty else { return [] }
+        let predicate = HKQuery.predicateForObjects(from: workout)
+        let predicates: [HKSamplePredicate<HKSample>] = types.sorted { $0.identifier < $1.identifier }
+            .map { .sample(type: $0, predicate: predicate) }
+        var anchor: HKQueryAnchor?
+        var references: [String: WorkoutSampleReference] = [:]
+        while true {
+            try Task.checkCancellation()
+            let query = HKAnchoredObjectQueryDescriptor(predicates: predicates, anchor: anchor, limit: 500)
+            let page = try await query.result(for: store)
+            for sample in page.addedSamples {
+                references[sample.uuid.uuidString] = WorkoutSampleReference(uuid: sample.uuid.uuidString,
+                                                                          tipo: sample.sampleType.identifier)
+            }
+            for deleted in page.deletedObjects { references.removeValue(forKey: deleted.uuid.uuidString) }
+            anchor = page.newAnchor
+            if page.addedSamples.count + page.deletedObjects.count < 500 { break }
+        }
+        return references.values.sorted { $0.uuid < $1.uuid }
+    }
+
+    @available(iOS 18.0, macOS 15.0, *)
+    private static func effortRelationships(for workout: HKWorkout, store: HKHealthStore) async throws -> [WorkoutEffortRelationshipRecord] {
+        try Task.checkCancellation()
+        let query = HKWorkoutEffortRelationshipQueryDescriptor(
+            predicate: HKQuery.predicateForObject(with: workout.uuid), anchor: nil, option: .default)
+        let result = try await query.result(for: store)
+        try Task.checkCancellation()
+        return result.relationships.map { relationship in
+            WorkoutEffortRelationshipRecord(
+                workout_uuid: relationship.workout.uuid.uuidString,
+                attivita_uuid: relationship.activity?.uuid.uuidString,
+                campioni: relationship.samples?.map {
+                    WorkoutSampleReference(uuid: $0.uuid.uuidString, tipo: $0.sampleType.identifier)
+                }.sorted { $0.uuid < $1.uuid })
+        }.sorted { ($0.attivita_uuid ?? "", $0.workout_uuid) < ($1.attivita_uuid ?? "", $1.workout_uuid) }
+    }
+
+    /// Each HKWorkoutRoute stays separate, with source, device and metadata.
+    static func routes(for workout: HKWorkout, store: HKHealthStore) async throws -> [WorkoutRouteRecord] {
         try Task.checkCancellation()
         let descriptor = HKSampleQueryDescriptor(
             predicates: [.workoutRoute(HKQuery.predicateForObjects(from: workout))],
             sortDescriptors: [SortDescriptor(\.startDate)])
         let routes = try await descriptor.result(for: store)
-        var points: [RoutePoint] = []
+        var records: [WorkoutRouteRecord] = []
         for route in routes {
             try Task.checkCancellation()
+            var points: [RoutePoint] = []
             for try await location in HKWorkoutRouteQueryDescriptor(route).results(for: store) {
                 try Task.checkCancellation()
                 points.append(RoutePoint(
@@ -281,14 +476,17 @@ enum Serializer {
                     alt: location.altitude, t: ISO.string(location.timestamp),
                     precisione_orizzontale_m: location.horizontalAccuracy,
                     precisione_verticale_m: location.verticalAccuracy,
-                    velocita_m_s: location.speed,
-                    precisione_velocita_m_s: location.speedAccuracy,
-                    direzione_gradi: location.course,
-                    precisione_direzione_gradi: location.courseAccuracy))
+                    velocita_m_s: location.speed, precisione_velocita_m_s: location.speedAccuracy,
+                    direzione_gradi: location.course, precisione_direzione_gradi: location.courseAccuracy))
             }
+            guard points.count == route.count else { throw SerializationError.incompleteRoute }
+            records.append(WorkoutRouteRecord(uuid: route.uuid.uuidString, inizio: ISO.string(route.startDate),
+                                              fine: ISO.string(route.endDate), fonte: source(route), punti: points,
+                                              provenienza: provenance(route), metadati: metadata(route.metadata),
+                                              metadati_typed: typedMetadata(route.metadata)))
         }
         try Task.checkCancellation()
-        return points
+        return records
     }
 
     /// Caratteristiche personali (non cambiano: inviate una volta).
@@ -467,11 +665,13 @@ enum Serializer {
 enum SerializationError: Error, LocalizedError {
     case incompleteQuantitySeries
     case incompleteECG
+    case incompleteRoute
 
     var errorDescription: String? {
         switch self {
         case .incompleteQuantitySeries: "HealthKit non ha restituito tutta la serie quantitativa. Riprova la sincronizzazione."
         case .incompleteECG: "HealthKit non ha restituito tutto il tracciato ECG. Riprova la sincronizzazione."
+        case .incompleteRoute: "HealthKit non ha restituito tutti i punti del percorso. Riprova la sincronizzazione."
         }
     }
 }

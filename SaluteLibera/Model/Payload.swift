@@ -42,6 +42,9 @@ struct SyncCheckpoint: Encodable, Sendable {
     let completed_at: String
     let groups: [String]
     let routes: Bool
+    /// Only explicit HealthKit authorization errors are listed. An empty result
+    /// cannot identify denied read access and is never labelled as pending.
+    var pending_types: [String]?
 }
 
 /// Dati originali della sorgente e del dispositivo, separati dal nome visualizzato.
@@ -70,6 +73,47 @@ struct QuantitySeriesPoint: Encodable, Sendable {
     let fine: String
 }
 
+/// JSON ricorsivo senza Any: i metadati conservano tipo e struttura. I valori
+/// speciali (date, quantità, numeri non finiti) usano un oggetto con il campo type.
+indirect enum MetadataValue: Encodable, Sendable {
+    case null
+    case bool(Bool)
+    case integer(Int64)
+    case unsigned(UInt64)
+    case number(Double)
+    case string(String)
+    case array([MetadataValue])
+    case object([String: MetadataValue])
+
+    func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case .null: try value.encodeNil()
+        case .bool(let v): try value.encode(v)
+        case .integer(let v): try value.encode(v)
+        case .unsigned(let v): try value.encode(v)
+        case .number(let v): try value.encode(v)
+        case .string(let v): try value.encode(v)
+        case .array(let v): try value.encode(v)
+        case .object(let v): try value.encode(v)
+        }
+    }
+}
+
+struct RecordInterval: Encodable, Sendable {
+    let inizio: String
+    let fine: String
+}
+
+struct DiscreteQuantityRecord: Encodable, Sendable {
+    let unita: String
+    let minimo: Double
+    let media: Double
+    let massimo: Double
+    let ultimo: Double
+    let intervallo_ultimo: RecordInterval
+}
+
 struct QuantityRecord: Encodable, Sendable {
     let uuid: String
     let tipo: String
@@ -83,6 +127,8 @@ struct QuantityRecord: Encodable, Sendable {
     var numero_quantita: Int?
     /// Quantità elementari quando HKQuantitySample.count > 1; stessa unità del riepilogo.
     var serie: [QuantitySeriesPoint]?
+    var metadati_typed: [String: MetadataValue]?
+    var statistiche_discrete: DiscreteQuantityRecord?
 }
 
 struct CategoryRecord: Encodable, Sendable {
@@ -95,6 +141,7 @@ struct CategoryRecord: Encodable, Sendable {
     let fonte: String
     var metadati: [String: String]?
     var provenienza: SampleProvenance?
+    var metadati_typed: [String: MetadataValue]?
 }
 
 struct CorrelationMember: Encodable, Sendable {
@@ -113,6 +160,7 @@ struct CorrelationRecord: Encodable, Sendable {
     let membri: [CorrelationMember]
     var metadati: [String: String]?
     var provenienza: SampleProvenance?
+    var metadati_typed: [String: MetadataValue]?
 }
 
 struct WorkoutStat: Encodable, Sendable {
@@ -121,6 +169,66 @@ struct WorkoutStat: Encodable, Sendable {
     var media: Double?
     var minimo: Double?
     var massimo: Double?
+    var ultimo: Double?
+    var intervallo_ultimo: RecordInterval?
+    var durata_s: Double?
+    var inizio: String?
+    var fine: String?
+    /// Se non esiste un'unità convertibile, questi oggetti espliciti preservano
+    /// le quantità originali e un errore visibile, senza eliminare la statistica.
+    var quantita_originali: [String: MetadataValue]?
+    var conversione: String?
+}
+
+struct WorkoutEventRecord: Encodable, Sendable {
+    let tipo_raw: Int
+    let inizio: String
+    let fine: String
+    var metadati: [String: String]?
+    var metadati_typed: [String: MetadataValue]?
+}
+
+struct WorkoutConfigurationRecord: Encodable, Sendable {
+    let attivita: String
+    let attivita_raw: UInt
+    let luogo_raw: Int
+    let luogo_nuoto_raw: Int
+    var lunghezza_vasca_m: Double?
+}
+
+struct WorkoutActivityRecord: Encodable, Sendable {
+    let uuid: String
+    let configurazione: WorkoutConfigurationRecord
+    let inizio: String
+    var fine: String?
+    let durata_s: Double
+    let eventi: [WorkoutEventRecord]
+    let statistiche: [String: WorkoutStat]
+    var metadati: [String: String]?
+    var metadati_typed: [String: MetadataValue]?
+}
+
+struct WorkoutRouteRecord: Encodable, Sendable {
+    let uuid: String
+    let inizio: String
+    let fine: String
+    let fonte: String
+    let punti: [RoutePoint]
+    var provenienza: SampleProvenance?
+    var metadati: [String: String]?
+    var metadati_typed: [String: MetadataValue]?
+}
+
+struct WorkoutSampleReference: Encodable, Sendable {
+    let uuid: String
+    let tipo: String
+}
+
+struct WorkoutEffortRelationshipRecord: Encodable, Sendable {
+    let workout_uuid: String
+    var attivita_uuid: String?
+    /// nil e [] mantengono il significato distinto dell'API originale.
+    var campioni: [WorkoutSampleReference]?
 }
 
 struct RoutePoint: Encodable, Sendable {
@@ -149,6 +257,16 @@ struct WorkoutRecord: Encodable, Sendable {
     var metadati: [String: String]?
     var percorso: [RoutePoint]?
     var provenienza: SampleProvenance?
+    var metadati_typed: [String: MetadataValue]?
+    var attivita_raw: UInt?
+    var eventi: [WorkoutEventRecord]?
+    var attivita_dettaglio: [WorkoutActivityRecord]?
+    /// nil = non richiesti; [] = richiesta completata senza percorsi leggibili.
+    /// I punti non vengono duplicati nel vecchio campo percorso.
+    var percorsi: [WorkoutRouteRecord]?
+    var campioni_associati: [WorkoutSampleReference]?
+    var ambito_campioni_associati: [String]?
+    var relazioni_sforzo: [WorkoutEffortRelationshipRecord]?
 }
 
 struct ECGRecord: Encodable, Sendable {
@@ -170,6 +288,7 @@ struct ECGRecord: Encodable, Sendable {
     var metadati: [String: String]?
     var provenienza: SampleProvenance?
     var numero_misure: Int?
+    var metadati_typed: [String: MetadataValue]?
 }
 
 struct AudiogramTest: Encodable, Sendable {
@@ -197,6 +316,7 @@ struct AudiogramRecord: Encodable, Sendable {
     let punti: [AudiogramPoint]
     var metadati: [String: String]?
     var provenienza: SampleProvenance?
+    var metadati_typed: [String: MetadataValue]?
 }
 
 struct StateOfMindRecord: Encodable, Sendable {
@@ -215,6 +335,7 @@ struct StateOfMindRecord: Encodable, Sendable {
     var associazioni_raw: [Int]?
     var metadati: [String: String]?
     var provenienza: SampleProvenance?
+    var metadati_typed: [String: MetadataValue]?
 }
 
 struct Characteristics: Encodable, Sendable {

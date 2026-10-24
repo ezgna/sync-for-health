@@ -24,3 +24,18 @@ iPhoneミラーリングで接続設定を保存し、実端末からのprotocol
 個別測定の表示値・単位の照合、アプリがバックグラウンドにある時の配送、ロック/解除、通信断からの復旧、Macスリープ復帰、長いGPSや大量履歴のメモリ。自動試験と署名なしビルドだけで、これらの完了を主張しない。
 
 送信範囲外の型、読取拒否、単独8MiB超record、旧バックアップ復元時の削除整合性などの制限は、READMEとHEALTHBRIDGE.mdを参照。
+
+
+## 2026-10-25 / 1.1 build 3
+
+取得範囲を拡張し、運動のイベント・各活動区間・ルート境界、型付きmetadata、心拍間隔、質問票、視力処方、服薬・日別リングsnapshotを追加した。大きな単独recordの分割再送・原子的再構築も追加した。
+
+- 設定29、通信/診断63、同期/背景64、既存serializer47、追加serializer27の契約検証を通過。
+- Mac受信器57試験を通過。実製品SwiftのRecordFrames/Uploaderから送信し、受信器再起動・Swift再起動・断片再送の後も、8MiB超・100,000点の合成GPSが全点一致。
+- 実HealthKitの監視constructorを、現行の監視対象200型について型別隔離processと一括で確認。HealthStoreの生成・実データ読取はしない。通常履歴queryのconstructorも別に検証。
+- Release全体の署名付きビルド・署名検証、実iPhoneへのbuild3導入、起動後の継続動作、更新後の実データ再同期とcheckpointを確認。新しい心拍間隔・日別リングの受信も確認。個人の値・件数・UUID等は共有ソースへ掲載しない。
+- 受信schema2から3へ、停止中のSQLite backup APIによるバックアップと整合性検証後に移行。既存sampleを保持して受信サービス再開を確認。
+
+build2では、視力処方をHKObserverQueryへ渡すため起動直後にnative例外で落ちた。実機crash logとconsoleで原因を確認し、build3で読取対象と監視対象を分離した。視力処方の読取・同期は残し、非対応の背景監視から除外。実Apple constructorを使用する回帰試験を追加した。
+
+元のHealthアプリとの全項目・全期間の照合、実在GPSの全点照合、巨大recordの実機メモリ、服薬/視力処方が存在する場合の全項目照合、長期間の背景実行は未確認。`scan_complete`を全読取許可の証明にはしない。残る対象外はCOVERAGE.md参照。

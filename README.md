@@ -33,7 +33,8 @@ Apple の[対応機能一覧](https://developer.apple.com/help/account/reference
 - 保存済みの本文を確認する **protocol v2 ACK** を採用。単なる HTTP 200 や HTML ページを同期成功にしません。
 - HTTPS と別欄の Bearer Token を使用。リダイレクト・URL 内の秘密情報を拒否し、接続先変更時の認証情報と同期位置を分離します。
 - 宛先ごとの同期位置をディスクへ確実に保存し、送信失敗・保存失敗時にサンプルを飛ばしません。
-- POST を件数・バイト数で制限。GPS はワークアウト 1 件ずつ送り、ルートの追加・削除・後付けを別カーソルで検知して再照合します。
+- POST を件数・バイト数で制限。大きな単独レコードは原本JSONを分割送信し、受信側で全断片を確実に保存・再構築してからサンプルとして確定します。GPSはルート単位の区切り・UUID・由来と全点を保持し、後付けや削除も再照合します。
+- 運動の一時停止・ラップ・各活動区間、型付きmetadata、数量の元集計値を保持します。追加された取得型はアップグレード後に過去分から再走査します。
 - UTC の小数秒、元アプリ・機器情報、数量 series、血圧の正規 correlation UUID、ECG の値と実時刻 offset を保持します。
 - 診断にサーバー本文・Token・任意のエラー説明を入れません。診断の送信は任意で、初期状態は OFF です。
 - デモはローカル表示用の合成データだけに限定します。
@@ -42,9 +43,9 @@ Apple の[対応機能一覧](https://developer.apple.com/help/account/reference
 
 ## 読み取りの範囲
 
-数量、カテゴリ、ワークアウト、ECG、聴力検査、心の状態、身体的属性、血圧 correlation を扱います。GPS は任意です。グループは初期状態で選ばれておらず、実際に送られるのはユーザーが HealthKit で許可したデータです。ヘルスケアへの書き込みは要求しません。
+数量、カテゴリ、ワークアウト、ECG、聴力検査、心の状態、身体的属性、血圧・食事 correlation、心拍間隔系列、GAD7/PHQ9、視力処方、服薬イベント、登録薬、日別アクティビティサマリーを扱います。GPS は任意です。グループは初期状態で選ばれておらず、実際に送られるのはユーザーが HealthKit で許可したデータです。ヘルスケアへの書き込みは要求しません。
 
-**Apple ヘルスケア全体の完全なバックアップではありません。** RR / heartbeat series、臨床記録、薬の全履歴、視力処方など、現在の catalog にない型は対象外です。アクティビティリング概要はアプリ画面の表示用に読みますが、同期 payload には含みません。Apple 純正のソース優先順位や重複調整を再現しないため、歩数などの生値を単純合計してもヘルスケア画面と一致するとは限りません。
+**Apple ヘルスケア全体の完全なバックアップではありません。** 病院由来のFHIR/CDA・検証可能な医療記録・添付、Medical ID、他アプリがHealthKitへ書き込んでいない値は対象外です。服薬・視力処方には対象ごとの追加許可が必要で、Appleが公開しないリマインダー全設定等は取得できません。詳しい対応範囲は [docs/COVERAGE.md](docs/COVERAGE.md) を参照してください。Apple 純正のソース優先順位や重複調整を再現しないため、歩数などの生値を単純合計してもヘルスケア画面と一致するとは限りません。
 
 iOS の背景実行、ロック中の HealthKit 読取制限、Tailscale の接続状態に左右されるため、即時・一定間隔・常時同期は保証しません。送信完了 checkpoint も、読取権限がすべて許可された証明にはなりません。
 
@@ -66,6 +67,8 @@ python3 tests/settings/run.py
 python3 tests/sync_engine_contract.py
 sh tests/transport/run.sh
 sh tests/serialization/run.sh
+sh tests/serialization/run-extended.sh
+python3 tests/background/run.py
 ```
 
 実行した検証と未確認範囲は [検証記録](docs/VALIDATION.md) にまとめています。

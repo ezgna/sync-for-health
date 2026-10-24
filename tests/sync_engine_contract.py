@@ -24,7 +24,10 @@ with tempfile.TemporaryDirectory(prefix='health-sync-contract-') as temporary:
     background = background[background.index('@MainActor\nenum HealthBackground'):background.index('/// BGAppRefreshTask')]
     demo = (root / 'SaluteLibera/Demo/DemoData.swift').read_text()
     demo = demo[demo.index('    static func runDemoSync('):demo.index('\n}\n\n/// Accende e spegne')]
-    (out / 'Production.swift').write_text('import Foundation\n' + source + '\n' + store + '\n' + background + '\nenum DemoData {\n' + demo + '\n}')
+    extended = (root / 'SaluteLibera/Sync/ExtendedSync.swift').read_text().replace('import HealthKit\n', '')
+    transport = (root / 'SaluteLibera/Sync/RecordTransport.swift').read_text()
+    (out / 'Production.swift').write_text('import Foundation\n' + source + '\n' + store + '\n' + background
+                                         + '\nenum DemoData {\n' + demo + '\n}\n' + extended + '\n' + transport)
     (out / 'Payload.swift').write_text((root / 'SaluteLibera/Model/Payload.swift').read_text())
     binary = out / 'contracts'
     subprocess.run(['swiftc', '-g', '-swift-version', '5', '-parse-as-library', *shlex.split(os.environ.get('SYNC_CONTRACT_SWIFT_FLAGS', '')),

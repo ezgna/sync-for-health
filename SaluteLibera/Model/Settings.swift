@@ -132,7 +132,7 @@ final class AppSettings {
         // A boot before first unlock must not rotate an otherwise valid cursor.
         guard credentialsLoaded else { return }
         let signature = [connectionID, enabledGroups.map(\.rawValue).sorted().joined(separator: ","),
-                         includeRoutes ? "routes" : "no-routes"].joined(separator: "|")
+                         includeRoutes ? "routes" : "no-routes", "capture-v3"].joined(separator: "|")
         if defaults.string(forKey: Keys.namespaceSignature) != signature {
             destinationID = UUID().uuidString
             defaults.set(destinationID, forKey: Keys.destination)

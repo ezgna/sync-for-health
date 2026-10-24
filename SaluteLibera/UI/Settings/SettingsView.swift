@@ -15,6 +15,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollViewReader { proxy in
             Form {
+                Section { HealthAccessControls() }
                 Section {
                     LabeledField(symbol: "link", title: "Indirizzo") {
                         TextField(text: $draftEndpoint, prompt: Text(verbatim: (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("it") ? "https://il-tuo-server.it/salute" : "https://your-server.example/health")) {

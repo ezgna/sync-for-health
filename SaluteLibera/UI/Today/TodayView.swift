@@ -4,6 +4,9 @@ struct TodayView: View {
     @Environment(TodayModel.self) private var model
     @Environment(SyncCenter.self) private var center
     @Environment(AppSettings.self) private var settings
+    @AppStorage("bridge.captureReview.v3") private var captureReviewed = false
+    @AppStorage("bridge.medicationReview.v3") private var medicationsReviewed = false
+    @AppStorage("bridge.visionReview.v3") private var visionReviewed = false
 
     var body: some View {
         NavigationStack {
@@ -25,6 +28,13 @@ struct TodayView: View {
                             .glassEffect(.regular.tint(Palette.brand[1].opacity(0.08)), in: .rect(cornerRadius: 16))
                     }
 
+                    if (!captureReviewed ||
+                        settings.enabledGroups.contains(.glicemia) && !medicationsReviewed ||
+                        settings.enabledGroups.contains(.corpo) && !visionReviewed) && !settings.demoMode {
+                        HealthAccessControls()
+                            .padding(16)
+                            .background(.regularMaterial, in: .rect(cornerRadius: 18))
+                    }
                     SyncHero()
 
                     Text("In evidenza")

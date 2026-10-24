@@ -277,6 +277,20 @@ struct SyncJob: Sendable {
     static let maxECGPerPost = 5
     static let maxPayloadBytes = 8 * 1024 * 1024
     typealias Progress = @Sendable (SyncProgress) async -> Void
+    static let pendingAuthorizationMessage = "一部のデータは読み取り権限の確認待ちです。読み取れたデータの同期は完了しました。"
+
+    /// Do not turn device locking, cancellation, malformed data or transport
+    /// errors into a successful scan. These are the actual authorization cases
+    /// declared in Apple's HKDefines.h, not arbitrary NSError numeric codes.
+    static func isReadAuthorizationError(_ error: Error) -> Bool {
+        guard let healthError = error as? HKError else { return false }
+        switch healthError.code {
+        case .errorAuthorizationDenied, .errorAuthorizationNotDetermined, .errorRequiredAuthorizationDenied:
+            return true
+        default:
+            return false
+        }
+    }
 
     enum Failure: LocalizedError {
         case oversizedRecord
@@ -323,6 +337,7 @@ struct SyncJob: Sendable {
         let scanID = UUID().uuidString
         let entries = HealthCatalog.entries(in: settings.groups)
         var status = SyncProgress(typeCount: entries.count)
+        var pendingTypes: Set<String> = []
         do {
             try await ensureCurrent()
             // Characteristics can change, and permissions can change. An empty
@@ -333,7 +348,12 @@ struct SyncJob: Sendable {
                 try await send(&batch, uploader: uploader, record: &record)
             }
             if settings.includeRoutes && settings.groups.contains(.allenamenti) {
-                try await reconcileRoutes(uploader: uploader, record: &record, status: &status, progress: progress)
+                do {
+                    try await reconcileRoutes(uploader: uploader, record: &record, status: &status, progress: progress)
+                } catch {
+                    guard Self.isReadAuthorizationError(error) else { throw error }
+                    pendingTypes.insert(HKSeriesType.workoutRoute().identifier)
+                }
             }
             for (index, entry) in entries.enumerated() {
                 try await ensureCurrent()
@@ -341,35 +361,58 @@ struct SyncJob: Sendable {
                 status.typeIndex = index + 1
                 status.typeIdentifier = entry.id
                 await progress(status)
-                var anchor = try AnchorStore.shared.anchor(for: entry.id, destination: settings.destinationID)
-                let limit = Self.pageLimit(entry, routes: settings.includeRoutes)
-                while true {
-                    try await ensureCurrent()
-                    let query = HKAnchoredObjectQueryDescriptor(predicates: [.sample(type: type)], anchor: anchor, limit: limit)
-                    let result = try await query.result(for: Health.store)
-                    let archived = try AnchorStore.archive(result.newAnchor)
-                    try await sendPage(result.addedSamples, deleted: result.deletedObjects.map(\.uuid.uuidString),
-                                       entry: entry, uploader: uploader, record: &record)
-                    try await ensureCurrent()
-                    try AnchorStore.shared.commit([entry.id: archived], destination: settings.destinationID)
-                    anchor = result.newAnchor
-                    status.samplesSent = record.samples + record.deleted
-                    status.blocksSent = record.requests
-                    await progress(status)
-                    // Includes deletion-only pages and commits the final empty
-                    // page, including when a preceding page exactly hit limit.
-                    if result.addedSamples.count + result.deletedObjects.count < limit { break }
+                do {
+                    var anchor = try AnchorStore.shared.anchor(for: entry.id, destination: settings.destinationID)
+                    let limit = Self.pageLimit(entry, routes: settings.includeRoutes)
+                    while true {
+                        try await ensureCurrent()
+                        let query = HKAnchoredObjectQueryDescriptor(predicates: [.sample(type: type)], anchor: anchor, limit: limit)
+                        let result = try await query.result(for: Health.store)
+                        let archived = try AnchorStore.archive(result.newAnchor)
+                        try await sendPage(result.addedSamples, deleted: result.deletedObjects.map(\.uuid.uuidString),
+                                           entry: entry, uploader: uploader, record: &record)
+                        try await ensureCurrent()
+                        try AnchorStore.shared.commit([entry.id: archived], destination: settings.destinationID)
+                        anchor = result.newAnchor
+                        status.samplesSent = record.samples + record.deleted
+                        status.blocksSent = record.requests
+                        await progress(status)
+                        // Includes deletion-only pages and commits the final empty
+                        // page, including when a preceding page exactly hit limit.
+                        if result.addedSamples.count + result.deletedObjects.count < limit { break }
+                    }
+                } catch {
+                    guard Self.isReadAuthorizationError(error) else { throw error }
+                    // Do not commit the failed page or pretend that this type
+                    // was empty. Continue independently authorized data types.
+                    pendingTypes.insert(entry.id)
                 }
             }
+            pendingTypes.formUnion(try await syncSupplementalSnapshots(uploader: uploader, record: &record))
             try await ensureCurrent()
             var checkpoint = Batch().makePayload(settings: settings)
             checkpoint.checkpoint = SyncCheckpoint(scan_id: scanID, completed_at: ISO.string(Date()),
                                                   groups: settings.groups.map(\.rawValue).sorted(), routes: settings.includeRoutes)
+            if !pendingTypes.isEmpty {
+                checkpoint.checkpoint?.status = "scan_partial"
+                checkpoint.checkpoint?.pending_types = pendingTypes.sorted()
+            }
             let bytes = try await uploader.send(checkpoint)
             record.bytes += bytes
             record.requests += 1
             try await ensureCurrent()
-            record.outcome = .riuscito
+            if pendingTypes.isEmpty {
+                record.outcome = .riuscito
+            } else {
+                record.outcome = .parziale
+                record.message = Self.pendingAuthorizationMessage
+                await MainActor.run {
+                    // A previously complete namespace is no longer complete if
+                    // an explicit authorization error now blocks one of its types.
+                    guard AppSettings.shared.isCurrent(settings) else { return }
+                    UserDefaults.standard.set(false, forKey: AppSettings.Keys.historyComplete)
+                }
+            }
         } catch {
             classify(error, into: &record)
         }
@@ -406,12 +449,31 @@ struct SyncJob: Sendable {
         var encodedUpperBound = 0
         for sample in samples {
             try await ensureCurrent()
+            if entry.kind.isExtended {
+                try await send(&batch, uploader: uploader, record: &record)
+                encodedUpperBound = 0
+                try await sendExtended(sample, uploader: uploader, record: &record)
+                continue
+            }
             var one = Batch()
             try await one.add([sample], entry: entry, includeRoutes: settings.includeRoutes)
             guard one.recordCount == 1 else { throw Failure.invalidRecord }
             // Summing single-record envelopes deliberately overestimates bytes,
             // and avoids re-encoding all earlier records for every new sample.
             let oneSize = try Self.encodedSize(one.makePayload(settings: settings))
+            if oneSize > Self.maxPayloadBytes {
+                try await send(&batch, uploader: uploader, record: &record)
+                encodedUpperBound = 0
+                let payload = try JSONDecoder().decode(WireJSON.self, from: RecordFrames.encode(one.makePayload(settings: settings)))
+                guard let section = payload.object?.first(where: { key, value in
+                    guard ["campioni", "categorie", "allenamenti", "ecg", "audiogrammi", "stati_d_animo", "correlazioni"].contains(key) else { return false }
+                    if case .array(let rows) = value { return rows.count == 1 }
+                    return false
+                }), case .array(let rows) = section.value, let row = rows.first else { throw Failure.invalidRecord }
+                try await sendRecordData(RecordFrames.encode(row), section: section.key,
+                                         uploader: uploader, record: &record)
+                continue
+            }
             if batch.count + one.count > Self.maxPerPost || encodedUpperBound + oneSize > Self.maxPayloadBytes {
                 try await send(&batch, uploader: uploader, record: &record)
                 batch = one
@@ -584,6 +646,9 @@ struct Batch {
             for case let m as HKStateOfMind in samples { moods.append(Serializer.stateOfMind(m)) }
         case .correlation:
             for case let c as HKCorrelation in samples { correlations.append(Serializer.correlation(c)) }
+        case .heartbeatSeries, .assessment, .visionPrescription, .medicationDoseEvent:
+            // These records use the same page/anchor logic through ExtendedSync.
+            throw SyncJob.Failure.invalidRecord
         }
     }
 

@@ -45,9 +45,10 @@ enum HealthBackground {
 
     private static func install(groups: Set<DataGroup>, includeRoutes: Bool, requestedGeneration: Int) async {
         let entries = HealthCatalog.entries(in: groups)
-        // Correlations have no background delivery. Their quantity members wake
-        // the coordinator, which also scans correlation records.
-        var observed = entries.filter { $0.kind != .correlation }.compactMap { entry in
+        // Read eligibility is separate from observer support. Vision prescriptions
+        // are readable but cause a native exception in HKObserverQuery.init.
+        // Regular scans still read every selected type, including these exclusions.
+        var observed = entries.filter(\.canObserve).compactMap { entry in
             entry.sampleType.map { ($0, entry.immediate) }
         }
         if includeRoutes && groups.contains(.allenamenti) {

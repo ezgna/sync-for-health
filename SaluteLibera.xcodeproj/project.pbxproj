@@ -33,6 +33,10 @@
 		C84513E48376B85B22D64086 /* SendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F183DE865D9874DF31065A4 /* SendsView.swift */; };
 		D703FA2D05682690500DE041 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = C346A99DAA8A7478D61E8F25 /* Stores.swift */; };
 		F9BAA908E5021A9788D63161 /* BrandMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486DAF19561D88869DFE19F9 /* BrandMark.swift */; };
+		72B83AE8FF8F4E20BFB903B0 /* ExtendedHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327B334C549399B9E8B25785 /* ExtendedHealth.swift */; };
+		1311ABF17228702BD7573AC1 /* RecordTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E298A45614408B77F4689EB8 /* RecordTransport.swift */; };
+		DCCE42E7F3619DE0B258707E /* ExtendedSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B9D19A7F25EDF4CE7A1D82 /* ExtendedSync.swift */; };
+		8B17288582A30D4BDCF3DA1B /* HealthAccessControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE93C22AF6E96DBE51A5B523 /* HealthAccessControls.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -65,6 +69,10 @@
 		E3CDEDA21945039C133186FD /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		E4C926941B0F3DAA581EAF63 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		F313CDE24415628370E255D1 /* HealthBridge.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		327B334C549399B9E8B25785 /* ExtendedHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedHealth.swift; sourceTree = "<group>"; };
+		E298A45614408B77F4689EB8 /* RecordTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordTransport.swift; sourceTree = "<group>"; };
+		E3B9D19A7F25EDF4CE7A1D82 /* ExtendedSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedSync.swift; sourceTree = "<group>"; };
+		AE93C22AF6E96DBE51A5B523 /* HealthAccessControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAccessControls.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -84,6 +92,8 @@
 		0C9C553ABDB399C6EA90279F /* Sync */ = {
 			isa = PBXGroup;
 			children = (
+				E3B9D19A7F25EDF4CE7A1D82 /* ExtendedSync.swift */,
+				E298A45614408B77F4689EB8 /* RecordTransport.swift */,
 				B55D31A6FD89B0BFC94F9757 /* Background.swift */,
 				53374DF33327337A756CB883 /* SyncEngine.swift */,
 				DA719048FC04F2B315A8AFB8 /* Uploader.swift */,
@@ -103,6 +113,7 @@
 		3CFFDF4B48570B6AFCEAF58E /* Health */ = {
 			isa = PBXGroup;
 			children = (
+				327B334C549399B9E8B25785 /* ExtendedHealth.swift */,
 				2862D0FCD0A8F08A6033635A /* HealthCatalog.swift */,
 				7C18F448E09D38EF41E285ED /* Serializer.swift */,
 				8C3E7F983BB4C1CADC191ACE /* TodayModel.swift */,
@@ -133,6 +144,7 @@
 		772325782357E0EDE91C416C /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AE93C22AF6E96DBE51A5B523 /* HealthAccessControls.swift */,
 				E4C926941B0F3DAA581EAF63 /* DiagnosticsView.swift */,
 				2CC43B9495ABC18C1DF98F77 /* SettingsView.swift */,
 			);
@@ -289,6 +301,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B17288582A30D4BDCF3DA1B /* HealthAccessControls.swift in Sources */,
+				DCCE42E7F3619DE0B258707E /* ExtendedSync.swift in Sources */,
+				1311ABF17228702BD7573AC1 /* RecordTransport.swift in Sources */,
+				72B83AE8FF8F4E20BFB903B0 /* ExtendedHealth.swift in Sources */,
 				5F77EFAFF9D337C353F8826E /* AppEnvironment.swift in Sources */,
 				629A0E84184AE045516787EE /* Background.swift in Sources */,
 				F9BAA908E5021A9788D63161 /* BrandMark.swift in Sources */,
@@ -338,6 +354,8 @@
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
+				CURRENT_PROJECT_VERSION = 3;
+				MARKETING_VERSION = 1.1;
 			};
 			name = Release;
 		};
@@ -490,6 +508,8 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
+				CURRENT_PROJECT_VERSION = 3;
+				MARKETING_VERSION = 1.1;
 			};
 			name = Debug;
 		};

@@ -2,16 +2,31 @@ import Foundation
 
 // Synthetic adapters only. Production SyncJob/Batch/Payload/AnchorStore are
 // extracted by the runner without reimplementing their state machine.
-enum DataGroup: String, Sendable { case corpo, cuore, allenamenti, ecg }
-enum EntryKind: Equatable, Sendable { case quantity(unit: String), category, correlation, workout, electrocardiogram, audiogram, stateOfMind }
+enum DataGroup: String, Sendable { case corpo, cuore, allenamenti, ecg, attivita, glicemia }
+enum EntryKind: Equatable, Sendable {
+    case quantity(unit: String), category, correlation, workout, electrocardiogram, audiogram, stateOfMind
+    case heartbeatSeries, assessment, visionPrescription, medicationDoseEvent
+    var isExtended: Bool {
+        switch self {
+        case .heartbeatSeries, .assessment, .visionPrescription, .medicationDoseEvent: true
+        default: false
+        }
+    }
+}
 struct CatalogEntry: Sendable {
     var id: String
     var kind: EntryKind
     var sampleType: HKSampleType? { .init(id: id) }
     var unit: HKUnit? { .init() }
     var immediate: Bool { true }
+    var canObserve: Bool {
+        switch kind {
+        case .correlation, .visionPrescription: false
+        default: true
+        }
+    }
 }
-struct HKSampleType: Sendable, Hashable { var id: String }
+struct HKSampleType: Sendable, Hashable { var id: String; var identifier: String { id } }
 struct HKUnit: Sendable {}
 final class HKQueryAnchor: NSObject, NSSecureCoding, @unchecked Sendable {
     static var supportsSecureCoding: Bool { true }
@@ -28,9 +43,18 @@ class HKWorkout: HKSample, @unchecked Sendable {}
 class HKElectrocardiogram: HKSample, @unchecked Sendable {}
 class HKAudiogramSample: HKSample, @unchecked Sendable {}
 class HKStateOfMind: HKSample, @unchecked Sendable {}
+class HKExtraSample: HKSample, @unchecked Sendable { var text = "synthetic-extra"; var section = "valutazioni" }
+struct FakeSnapshotRow: Encodable, Sendable { var id: String; var value: String }
 struct HKDeletedObject: Sendable { var uuid: UUID }
-struct HKError: Error { enum Code { case errorDatabaseInaccessible }; var code: Code }
+struct HKError: Error {
+    enum Code { case errorDatabaseInaccessible, errorAuthorizationDenied, errorAuthorizationNotDetermined, errorRequiredAuthorizationDenied }
+    var code: Code
+}
 enum HKSeriesType { static func workoutRoute() -> HKSampleType { .init(id: "routes") } }
+enum HKObjectType {
+    static func activitySummaryType() -> HKSampleType { .init(id: "activity-summary") }
+    static func userAnnotatedMedicationType() -> HKSampleType { .init(id: "medication-catalog") }
+}
 enum AppEnvironment { static var isDemo = false }
 @MainActor final class AppSettings {
     static let shared = AppSettings()
@@ -84,17 +108,35 @@ final class FakeStore {
     var pendingDisables: [(Bool, Error?) -> Void] = []
     var pendingEnables: [(String, (Bool, Error?) -> Void)] = []
     var observerEvents: [String] = []
+    var observedTypes: [String] = []
+    var activityRows: [FakeSnapshotRow] = []
+    var medicationRows: [FakeSnapshotRow] = []
+    var snapshotError = false
+    var activityError: Error?
+    var medicationError: Error?
+    var queryErrors: [String: Error] = [:]
+    var snapshotCalls = 0
     func disableAllBackgroundDelivery(completion: @escaping (Bool, Error?) -> Void) { pendingDisables.append(completion); observerEvents.append("disable") }
     func enableBackgroundDelivery(for type: HKSampleType, frequency: FakeFrequency, completion: @escaping (Bool, Error?) -> Void) { pendingEnables.append((type.id, completion)); observerEvents.append("enable:" + type.id) }
-    func execute(_ query: HKObserverQuery) { observerEvents.append("observe") }
+    func execute(_ query: HKObserverQuery) {
+        observerEvents.append("observe")
+        observedTypes = query.queryDescriptors.map { $0.sampleType.identifier }
+    }
     func stop(_ query: HKObserverQuery) { observerEvents.append("stop") }
-    func reset() { events = [:]; calls = []; routeAvailable = false }
+    func reset() {
+        events = [:]; calls = []; routeAvailable = false
+        activityRows = []; medicationRows = []; snapshotError = false; snapshotCalls = 0
+        activityError = nil; medicationError = nil; queryErrors = [:]
+    }
 }
 enum Health { static let isAvailable = true; static let store = FakeStore() }
 enum FakeFrequency { case immediate, hourly }
 struct HKQueryDescriptor { var sampleType: HKSampleType; var predicate: NSPredicate? }
 final class HKObserverQuery {
-    init(queryDescriptors: [HKQueryDescriptor], updateHandler: @escaping (HKObserverQuery, Set<HKSampleType>?, @escaping () -> Void, Error?) -> Void) {}
+    let queryDescriptors: [HKQueryDescriptor]
+    init(queryDescriptors: [HKQueryDescriptor], updateHandler: @escaping (HKObserverQuery, Set<HKSampleType>?, @escaping () -> Void, Error?) -> Void) {
+        self.queryDescriptors = queryDescriptors
+    }
 }
 @MainActor final class UIApplication {
     static let shared = UIApplication()
@@ -135,6 +177,7 @@ struct HKAnchoredObjectQueryDescriptor {
     func result(for store: FakeStore) async throws -> Result {
         let id = predicates[0].id, start = anchor?.offset ?? 0
         store.calls.append((id, start, limit))
+        if let error = store.queryErrors[id] { throw error }
         let all = store.events[id] ?? [], page = Array(all.dropFirst(start).prefix(limit))
         return Result(addedSamples: page.compactMap(\.sample), deletedObjects: page.compactMap { $0.deleted.map { .init(uuid: $0) } }, newAnchor: .init(offset: min(all.count, start + page.count)))
     }
@@ -142,12 +185,13 @@ struct HKAnchoredObjectQueryDescriptor {
 @MainActor final class FakeHTTP {
     static let shared = FakeHTTP()
     var requests: [Payload] = []
+    var wireRequests: [WireEnvelope] = []
     var failures: Set<Int> = []
     var calls = 0
     var changeSettingsAfterCall: Int?
     var suspendCalls: Set<Int> = []
     var waitingUploads: [Int: CheckedContinuation<Void, Never>] = [:]
-    func reset() { requests = []; failures = []; calls = 0; changeSettingsAfterCall = nil; suspendCalls = []; waitingUploads = [:] }
+    func reset() { requests = []; wireRequests = []; failures = []; calls = 0; changeSettingsAfterCall = nil; suspendCalls = []; waitingUploads = [:] }
 }
 struct Uploader: Sendable {
     var endpoint: URL; var token: String; var gzip: Bool
@@ -164,6 +208,38 @@ struct Uploader: Sendable {
         http.requests.append(payload)
         if http.changeSettingsAfterCall == http.calls { await MainActor.run { AppSettings.shared.current = false } }
         return try SyncJob.encodedSize(payload)
+    }
+    @MainActor func send(_ envelope: WireEnvelope) async throws -> Int {
+        let http = FakeHTTP.shared
+        http.calls += 1
+        let call = http.calls
+        if http.suspendCalls.contains(call) {
+            await withCheckedContinuation { http.waitingUploads[call] = $0 }
+            try Task.checkCancellation()
+        }
+        if http.failures.contains(call) { throw UploadError.network }
+        http.wireRequests.append(envelope)
+        if http.changeSettingsAfterCall == http.calls { AppSettings.shared.current = false }
+        return try RecordFrames.encode(envelope).count
+    }
+}
+enum ExtendedHealth {
+    struct Extra: Encodable, Sendable { let uuid: String; let value: String; let section: String }
+    static func sample(_ sample: HKSample, store: FakeStore) async throws -> Extra {
+        guard let extra = sample as? HKExtraSample else { throw SyncJob.Failure.invalidRecord }
+        return Extra(uuid: extra.uuid.uuidString, value: extra.text, section: extra.section)
+    }
+    static func activitySummaries(store: FakeStore, timeZone: TimeZone) async throws -> [FakeSnapshotRow] {
+        store.snapshotCalls += 1
+        if let error = store.activityError { throw error }
+        if store.snapshotError { throw UploadError.network }
+        return store.activityRows
+    }
+    static func medications(store: FakeStore) async throws -> [FakeSnapshotRow] {
+        store.snapshotCalls += 1
+        if let error = store.medicationError { throw error }
+        if store.snapshotError { throw UploadError.network }
+        return store.medicationRows
     }
 }
 enum Serializer {
@@ -249,10 +325,122 @@ func check(_ condition: Bool, _ name: String) { precondition(condition, name); r
         let mixed = await job().run { _ in }
         check(mixed.outcome == .riuscito && mixed.deleted == 100 && cursor("q") == 101, "deletions_after_near_limit_record_split_before_byte_cap")
         check(try FakeHTTP.shared.requests.allSatisfy { try SyncJob.encodedSize($0) <= SyncJob.maxPayloadBytes }, "mixed_added_deleted_posts_within_byte_limit")
+        let largeIntegerJSON = Data("{\"uuid\":\"11111111-1111-4111-8111-111111111111\",\"integer\":18446744073709551615,\"fraction\":1.123456789,\"flag\":true}".utf8)
+        let integerFrames = try RecordFrames(data: largeIntegerJSON, section: "valutazioni",
+                                             installation: "synthetic", destination: "synthetic", device: "synthetic", sentAt: "x")
+        let integerEnvelope = try JSONSerialization.jsonObject(with: RecordFrames.encode(Array(integerFrames)[0])) as! [String: Any]
+        let integerRow = (integerEnvelope["valutazioni"] as! [[String: Any]])[0]
+        check((integerRow["integer"] as? NSNumber)?.uint64Value == UInt64.max,
+              "wire_transport_preserves_unsigned_integer_extreme")
+        check(integerRow["fraction"] as? Double == 1.123456789 && integerRow["flag"] as? Bool == true,
+              "wire_transport_preserves_fraction_and_boolean_types")
         reset([q]); let oversized = HKQuantitySample(); oversized.text = String(repeating: "a", count: 9 * 1024 * 1024)
         Health.store.events["q"] = [.init(sample: oversized, deleted: nil)]
         let tooBig = await job().run { _ in }
-        check(tooBig.outcome == .errore && cursor("q") == nil && FakeHTTP.shared.requests.isEmpty, "oversized_single_record_fails_without_skip")
+        check(tooBig.outcome == .riuscito && cursor("q") == 1 && FakeHTTP.shared.wireRequests.count > 1,
+              "oversized_single_record_is_fragmented_without_skip")
+        check(try FakeHTTP.shared.wireRequests.allSatisfy { try RecordFrames.encode($0).count <= SyncJob.maxPayloadBytes },
+              "every_record_fragment_within_byte_limit")
+        var assembled = Data()
+        for envelope in FakeHTTP.shared.wireRequests {
+            guard case .array(let fragments) = envelope.fields["frammenti"],
+                  let fragment = fragments.first?.object,
+                  let encoded = fragment["data_base64"]?.string,
+                  let part = Data(base64Encoded: encoded) else { preconditionFailure("missing fragment bytes") }
+            assembled.append(part)
+        }
+        let assembledRow = try JSONSerialization.jsonObject(with: assembled) as! [String: Any]
+        check(assembledRow["uuid"] as? String == oversized.uuid.uuidString
+                && (assembledRow["metadati"] as? [String: String])?["synthetic"] == oversized.text,
+              "fragment_bytes_reassemble_the_entire_original_record")
+        reset([q]); Health.store.events["q"] = [.init(sample: oversized, deleted: nil)]; FakeHTTP.shared.failures = [2]
+        let fragmentFailed = await job().run { _ in }
+        check(fragmentFailed.outcome == .parziale && cursor("q") == nil && FakeHTTP.shared.wireRequests.count == 1
+                && FakeHTTP.shared.requests.allSatisfy { $0.checkpoint == nil },
+              "fragment_failure_keeps_page_cursor_and_checkpoint_uncommitted")
+        FakeHTTP.shared.reset()
+        let fragmentResumed = await job().run { _ in }
+        check(fragmentResumed.outcome == .riuscito && cursor("q") == 1 && fragmentResumed.samples == 1,
+              "fragment_failure_resends_full_original_record")
+
+        let extra = CatalogEntry(id: "extra", kind: .assessment)
+        reset([extra]); Health.store.events["extra"] = [.init(sample: HKExtraSample(), deleted: nil)]
+        let extraResult = await job().run { _ in }
+        check(extraResult.samples == 1 && cursor("extra") == 1
+                && FakeHTTP.shared.wireRequests.first?.fields["valutazioni"] != nil,
+              "extended_sample_uses_production_page_and_transport")
+        reset([extra]); Health.store.events["extra"] = [.init(sample: HKExtraSample(), deleted: nil)]; FakeHTTP.shared.failures = [1]
+        _ = await job().run { _ in }
+        check(cursor("extra") == nil && FakeHTTP.shared.requests.allSatisfy { $0.checkpoint == nil },
+              "extended_sample_failed_ack_does_not_advance_anchor")
+
+        reset([]); Health.store.activityRows = (0..<175).map { .init(id: String($0), value: "original") }
+        let snapshots = await job(groups: [.attivita]).run { _ in }
+        check(snapshots.samples == 1 && FakeHTTP.shared.wireRequests.count == 1,
+              "daily_snapshot_contains_all_rows_beyond_old_prefix")
+        if case .array(let records) = FakeHTTP.shared.wireRequests[0].fields["riepiloghi_attivita"],
+           case .array(let days) = records[0].object?["records"] {
+            check(days.count == 175, "all_accessible_daily_rows_in_single_atomic_record")
+        } else { preconditionFailure("missing activity snapshot") }
+        FakeHTTP.shared.reset()
+        _ = await job(groups: [.attivita]).run { _ in }
+        check(FakeHTTP.shared.wireRequests.isEmpty && Health.store.snapshotCalls == 2,
+              "unchanged_snapshot_rereads_healthkit_without_resending")
+        Health.store.activityRows[174].value = "edited"; FakeHTTP.shared.reset()
+        _ = await job(groups: [.attivita]).run { _ in }
+        check(FakeHTTP.shared.wireRequests.count == 1, "edits_to_later_daily_rows_replace_snapshot")
+        Health.store.activityRows = []; FakeHTTP.shared.reset()
+        _ = await job(groups: [.attivita]).run { _ in }
+        check(FakeHTTP.shared.wireRequests.count == 1, "removed_daily_rows_send_explicit_empty_snapshot")
+        reset([]); Health.store.medicationRows = [.init(id: "med", value: "original")]; FakeHTTP.shared.failures = [1]
+        _ = await job(groups: [.glicemia]).run { _ in }
+        check(try AnchorStore.shared.data(for: "healthbridge.snapshot.medications.digest.v1", destination: "synthetic-destination-a") == nil,
+              "failed_medication_snapshot_does_not_commit_digest")
+        FakeHTTP.shared.reset()
+        _ = await job(groups: [.glicemia]).run { _ in }
+        check(FakeHTTP.shared.wireRequests.first?.fields["farmaci"] != nil,
+              "medication_snapshot_retries_after_failed_ack")
+        reset([]); Health.store.snapshotError = true
+        let snapshotQueryFailed = await job(groups: [.attivita]).run { _ in }
+        check(snapshotQueryFailed.outcome == .errore && FakeHTTP.shared.requests.isEmpty && FakeHTTP.shared.wireRequests.isEmpty,
+              "snapshot_query_error_is_not_false_empty_success")
+        let blocked = CatalogEntry(id: "vision", kind: .visionPrescription)
+        for (code, name) in [(HKError.Code.errorAuthorizationDenied, "denied"),
+                             (.errorAuthorizationNotDetermined, "undetermined"),
+                             (.errorRequiredAuthorizationDenied, "required_denied")] {
+            reset([blocked, q]); Health.store.queryErrors["vision"] = HKError(code: code)
+            Health.store.events["q"] = added(1)
+            TestDefaults.standard.set(true, forKey: AppSettings.Keys.historyComplete)
+            let pending = await job().run { _ in }
+            check(pending.outcome == .parziale && cursor("vision") == nil && cursor("q") == 1
+                    && FakeHTTP.shared.requests.last?.checkpoint?.status == "scan_partial"
+                    && FakeHTTP.shared.requests.last?.checkpoint?.pending_types == ["vision"]
+                    && TestDefaults.standard.values[AppSettings.Keys.historyComplete] == false,
+                  "explicit_\(name)_permission_continues_other_types_without_false_history_complete")
+        }
+        reset([blocked, q]); Health.store.events["q"] = added(1)
+        let emptyAccessible = await job().run { _ in }
+        check(emptyAccessible.outcome == .riuscito && FakeHTTP.shared.requests.last?.checkpoint?.pending_types == nil
+                && cursor("vision") == 0, "empty_query_is_not_mislabeled_denied_permission")
+        reset([]); Health.store.activityError = HKError(code: .errorAuthorizationDenied)
+        Health.store.medicationRows = [.init(id: "med", value: "accessible")]
+        let partialActivity = await job(groups: [.attivita, .glicemia]).run { _ in }
+        check(partialActivity.outcome == .parziale && FakeHTTP.shared.wireRequests.first?.fields["farmaci"] != nil
+                && FakeHTTP.shared.requests.last?.checkpoint?.pending_types == ["activity-summary"],
+              "blocked_activity_snapshot_does_not_block_medication_snapshot")
+        reset([]); Health.store.medicationError = HKError(code: .errorAuthorizationNotDetermined)
+        let partialMedication = await job(groups: [.attivita, .glicemia]).run { _ in }
+        check(partialMedication.outcome == .parziale && FakeHTTP.shared.wireRequests.first?.fields["riepiloghi_attivita"] != nil
+                && FakeHTTP.shared.requests.last?.checkpoint?.pending_types == ["medication-catalog"],
+              "blocked_medication_catalog_keeps_other_snapshot_and_explicit_pending_type")
+        reset([q]); Health.store.queryErrors["q"] = HKError(code: .errorDatabaseInaccessible)
+        let locked = await job().run { _ in }
+        check(locked.outcome == .inAttesa && FakeHTTP.shared.requests.isEmpty,
+              "locked_health_database_stops_without_checkpoint")
+        reset([q]); Health.store.queryErrors["q"] = CancellationError()
+        let cancelledQuery = await job().run { _ in }
+        check(cancelledQuery.outcome == .interrotto && FakeHTTP.shared.requests.isEmpty,
+              "cancelled_health_query_stops_without_partial_checkpoint")
         reset([q]); Health.store.events["q"] = added(1); FakeHTTP.shared.failures = [2]
         _ = await job().run { _ in }
         check(cursor("q") == 1 && FakeHTTP.shared.requests.allSatisfy { $0.checkpoint == nil }, "checkpoint_failure_preserves_sample_cursor")
@@ -347,6 +535,27 @@ func check(_ condition: Bool, _ name: String) { precondition(condition, name); r
         Health.store.pendingDisables.removeFirst()(true, nil)
         await spin { Health.store.pendingEnables.count == 1 }
         Health.store.pendingEnables.removeFirst().1(true, nil)
+        HealthBackground.stop()
+        await spin { Health.store.pendingDisables.count == 1 }
+        Health.store.pendingDisables.removeFirst()(true, nil)
+        HealthCatalog.list = [q,
+            CatalogEntry(id: "vision", kind: .visionPrescription),
+            CatalogEntry(id: "correlation", kind: .correlation),
+            CatalogEntry(id: "heartbeat", kind: .heartbeatSeries),
+            CatalogEntry(id: "assessment", kind: .assessment),
+            CatalogEntry(id: "medication-dose", kind: .medicationDoseEvent)]
+        Health.store.observedTypes = []
+        HealthBackground.restart(groups: [.corpo, .cuore])
+        await spin { Health.store.pendingDisables.count == 1 }
+        Health.store.pendingDisables.removeFirst()(true, nil)
+        for _ in 0..<4 {
+            await spin { Health.store.pendingEnables.count == 1 }
+            Health.store.pendingEnables.removeFirst().1(true, nil)
+        }
+        check(Set(Health.store.observedTypes) == Set(["q", "heartbeat", "assessment", "medication-dose"]),
+              "observer_excludes_native_unsupported_vision_without_excluding_readable_new_types")
+        check(HealthCatalog.entries(in: [.corpo]).contains { $0.kind == .visionPrescription },
+              "vision_remains_readable_when_observer_is_unsupported")
         HealthBackground.stop()
         await spin { Health.store.pendingDisables.count == 1 }
         Health.store.pendingDisables.removeFirst()(true, nil)
